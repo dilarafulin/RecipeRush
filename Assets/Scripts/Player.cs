@@ -171,4 +171,9 @@ public class Player : MonoBehaviour, IKitchenObjectParent, IMovable
             transform.forward = Vector3.Slerp(transform.forward, moveDir, Time.deltaTime * rotateSpeed);
         }
     }
+
+    public BaseCounter GetSelectedCounter()
+    {
+        return selectedCounter;
+    }
 }
