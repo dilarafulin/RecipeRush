@@ -199,4 +199,37 @@ public class StoveCounter : BaseCounter, IHasProgress
             if (recipe.input == inputSO) return recipe;
         return null;
     }
+
+    // Ajanın "Player" olmadan ocağa eti koyabilmesi için
+    public void InteractFromAgent(IKitchenObjectParent agent)
+    {
+        if (!HasKitchenObject() && agent.HasKitchenObject())
+        {
+            if (HasFryingRecipeFor(agent.GetKitchenObject().GetKitchenObjectSO()))
+            {
+                agent.GetKitchenObject().SetKitchenObjectParent(this);
+                activeFryingRecipe = GetFryingRecipeFor(GetKitchenObject().GetKitchenObjectSO());
+
+                state = State.Idle;
+                fryingTimer = 0f;
+
+                OnStateChanged?.Invoke(this, new OnStateChangedEventArgs { state = state });
+                OnProgressChanged?.Invoke(this, new IHasProgress.OnProgressChangedEventArgs { progressNormalized = 0f });
+            }
+        }
+    }
+
+    // Ajan pişen eti aldığında ocağı sıfırlayıp UI barını kapatmak için
+    public void ResetStoveFromAgent()
+    {
+        state = State.Idle;
+        OnStateChanged?.Invoke(this, new OnStateChangedEventArgs { state = state });
+        OnProgressChanged?.Invoke(this, new IHasProgress.OnProgressChangedEventArgs { progressNormalized = 0f });
+    }
+
+    // Ajanın ocağın durumunu (State) uzaktan okuyabilmesi için Getter'lar
+    public bool IsIdle() => state == State.Idle;
+
+    // Eğer et yanarsa da ajan onu alabilsin diye Burned durumunu da kabul ediyoruz
+    public bool IsFried() => state == State.Fried || state == State.Burned;
 }

@@ -9,6 +9,7 @@ public class SousChefCommandUI : MonoBehaviour
     [Header("Referanslar")]
     [SerializeField] private SousChefTaskManager taskManager;
     [SerializeField] private Player player;
+    [SerializeField] private LayerMask countersLayerMask;
 
     [Header("UI Elemanlarý")]
     [SerializeField] private GameObject menuPanel;   // Menünün arka plan kutusu 
@@ -35,15 +36,26 @@ public class SousChefCommandUI : MonoBehaviour
 
     private void TryOpenMenu()
     {
-        // Oyuncunun önündeki counter'ý al 
-        BaseCounter counter = player.GetSelectedCounter();
-        if (counter == null) return;  // Boþluða bakýyorsa menü açma
+        // 1. Mouse imlecinin olduðu yerden ekranýn derinliðine doðru bir ýþýn (Ray) oluþtur
+        Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
 
-        // O counter'a göre hangi komutlarýn verilebileceðini listele 
-        List<(string label, SousChefCommand cmd)> commands = GetCommandsFor(counter);
-        if (commands.Count == 0) return;
+        // 2. Bu ýþýn 100 birim boyunca gidip bir Counter'a çarpýyor mu bak
+        if (Physics.Raycast(ray, out RaycastHit hit, 100f, countersLayerMask))
+        {
+            // 3. Çarptýðý objedeki Counter bileþenini al
+            BaseCounter counter = hit.collider.GetComponent<BaseCounter>();
 
-        OpenMenu(counter, commands);
+            if (counter != null)
+            {
+                // O tezgaha uygun komutlarý hazýrla
+                List<(string label, SousChefCommand cmd)> commands = GetCommandsFor(counter);
+
+                if (commands.Count > 0)
+                {
+                    OpenMenu(counter, commands);
+                }
+            }
+        }
     }
 
     // BAÐLAMA DUYARLI MANTIK (Context-Sensitive)
