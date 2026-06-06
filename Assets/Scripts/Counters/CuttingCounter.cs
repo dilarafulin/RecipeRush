@@ -3,14 +3,12 @@ using UnityEngine;
 
 public class CuttingCounter : BaseCounter, IHasProgress
 {
-    // Progress Bar (UI) için event
     public event EventHandler<IHasProgress.OnProgressChangedEventArgs> OnProgressChanged;
 
     [SerializeField] private CuttingRecipeSO[] cuttingRecipeSOArray; // Desteklenen tüm tarifler
 
     private int cuttingProgress;
 
-    // E Tuşu - Eşya Koyma / Alma
     public override void Interact(Player player)
     {
         if (!HasKitchenObject()) // Tezgah boş
@@ -60,7 +58,7 @@ public class CuttingCounter : BaseCounter, IHasProgress
         }
     }
 
-    // F Tuşu - Kesme İşlemi
+    //kesme,f tusu
     public override void InteractAlternate(Player player)
     {
         if (HasKitchenObject() && HasRecipeWithInput(GetKitchenObject().GetKitchenObjectSO()))
@@ -89,8 +87,6 @@ public class CuttingCounter : BaseCounter, IHasProgress
             }
         }
     }
-
-    // --- YARDIMCI FONKSİYONLAR ---
 
     // Elimizdeki malzemeyle eşleşen bir tarif var mı?
     private bool HasRecipeWithInput(KitchenObjectSO inputKitchenObjectSO)
@@ -122,9 +118,7 @@ public class CuttingCounter : BaseCounter, IHasProgress
         }
         return null;
     }
-    // ── YAPAY ZEKA (AJAN) İÇİN YARDIMCI METOTLAR ─────────────────
-
-    public void InteractFromAgent(IKitchenObjectParent agent)
+    public override void InteractFromAgent(SousChefAgent agent)
     {
         if (!HasKitchenObject()) // Tezgah boşsa ajan koysun
         {
@@ -149,5 +143,46 @@ public class CuttingCounter : BaseCounter, IHasProgress
                 OnProgressChanged?.Invoke(this, new IHasProgress.OnProgressChangedEventArgs { progressNormalized = 0f });
             }
         }
+    }
+    public override SousChefTask GetTaskForAgent(SousChefAgent agent)
+    {
+        if (HasKitchenObject() && !agent.HasKitchenObject())
+        {
+            // Tezgahtaki eşyanın kesilme tarifi yoksa, demek ki zaten kesilmiştir
+            bool isItemFullyCut = !HasRecipeWithInput(GetKitchenObject().GetKitchenObjectSO());
+
+            if (isItemFullyCut)
+            {
+                // Kesme bitmiş, ajana "Malzemeyi Eline Al" komutu ver
+                return new SousChefTask(SousChefCommand.FetchIngredient, this);
+            }
+            else
+            {
+                // Malzemenin hala tarifi var (kesilmemiş). Ajana "Kesmeye Devam Et" komutu ver
+                return new SousChefTask(SousChefCommand.ChopIngredient, this);
+            }
+        }
+
+        // 2. DURUM: Tahta boş ve ajanın elinde malzeme var
+        if (!HasKitchenObject() && agent.HasKitchenObject())
+        {
+            // Ajanın elindeki malzemenin kesilme tarifi var mı? (Örn: Elinde tabak varsa tahtaya koymasın)
+            if (HasRecipeWithInput(agent.GetKitchenObject().GetKitchenObjectSO()))
+            {
+                // Kesilebilir bir malzeme, tahtaya "Bırak" komutu ver
+                return new SousChefTask(SousChefCommand.DeliverToCounter, this);
+            }
+        }
+
+        return null; // Hiçbir şarta uymuyorsa görev verme
+    }
+
+    // Dışarıdaki scriptlerin (Agent'ın) malzemenin tamamen kesilip kesilmediğini öğrenmesi için
+    public bool IsFullyCut()
+    {
+        if (!HasKitchenObject()) return false;
+
+        // Eğer malzemenin başka bir kesilme tarifi yoksa (bütün değilse) tamamen kesilmiştir.
+        return !HasRecipeWithInput(GetKitchenObject().GetKitchenObjectSO());
     }
 }

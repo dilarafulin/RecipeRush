@@ -55,4 +55,21 @@ public class PlatesCounter : BaseCounter
             }
         }
     }
+
+    public override void InteractFromAgent(SousChefAgent agent)
+    {
+        if (!agent.HasKitchenObject())
+        {
+            KitchenObject.SpawnKitchenObject(plateKitchenObjectSO, agent);
+        }
+    }
+
+    public override SousChefTask GetTaskForAgent(SousChefAgent agent)
+    {
+        if (!agent.HasKitchenObject())
+        {
+            return new SousChefTask(SousChefCommand.FetchIngredient, this);
+        }
+        return null;
+    }
 }

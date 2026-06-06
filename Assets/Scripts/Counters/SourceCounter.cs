@@ -14,12 +14,22 @@ public class SourceCounter : BaseCounter
         // Oyuncunun elinde bir þey varsa hiçbir þey yapma
     }
 
-    public void InteractFromAgent(IKitchenObjectParent agent)
+    public override void InteractFromAgent(SousChefAgent agent)
     {
         // Ajanýn eli boþsa, ona yeni bir malzeme (Örn: Domates) üret ve ver
         if (!agent.HasKitchenObject())
         {
             KitchenObject.SpawnKitchenObject(kitchenObjectSO, agent);
         }
+    }
+
+    public override SousChefTask GetTaskForAgent(SousChefAgent agent)
+    {
+        // Ajanýn eli boþsa 
+        if (!agent.HasKitchenObject())
+        {
+            return new SousChefTask(SousChefCommand.FetchIngredient, this);
+        }
+        return null;
     }
 }

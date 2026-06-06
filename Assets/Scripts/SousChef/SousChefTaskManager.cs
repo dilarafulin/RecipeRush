@@ -1,23 +1,48 @@
 ﻿using UnityEngine;
-
+using System;
 public class SousChefTaskManager : MonoBehaviour
 {
+    public static SousChefTaskManager Instance { get; private set; }
+
+    public event EventHandler OnTaskChanged;
+
     [Header("Referanslar")]
-    [SerializeField] private SousChefAgent agent; // Görevi vereceğimiz ajan 
+    [SerializeField] private SousChefAgent agent;
 
     private SousChefTask activeTask;
 
-    // ── OYUNCUDAN (UI) KOMUT GELİR ──────────────────────────────────
+    private void Awake()
+    {
+        Instance = this;
+    }
+
+    //polimorfizm
+    public void AssignTaskBasedOnContext(BaseCounter clickedCounter)
+    {
+        // 1. Tıklanan tezgaha "Şu anki durumda ajanın ne yapması lazım?" diye soruyoruz
+        SousChefTask newTask = clickedCounter.GetTaskForAgent(agent);
+
+        // 2. Eğer tezgah mantıklı bir görev döndürdüyse, senin orijinal sistemine yolluyoruz
+        if (newTask != null)
+        {
+            GiveCommand(newTask.command, newTask.targetCounter, newTask.targetItemSO);
+        }
+        else
+        {
+            Debug.Log("[TaskManager] Bu duruma uygun mantıklı bir görev bulunamadı (Belki tezgah boş, belki de ajanın eli yanlış dolu).");
+        }
+    }
+
     public void GiveCommand(SousChefCommand command, BaseCounter targetCounter, KitchenObjectSO itemSO = null)
     {
-       // 1. Yeni bir görev paketi oluştur [cite: 25]
         activeTask = new SousChefTask(command, targetCounter, itemSO);
 
-        // 2. Paketi Ajana teslim et 
         if (agent != null)
         {
             agent.SetTask(activeTask);
             Debug.Log($"[TaskManager] Yeni Komut Verildi: {command} → Hedef: {targetCounter.name}");
+
+            OnTaskChanged?.Invoke(this, EventArgs.Empty);
         }
         else
         {
@@ -25,18 +50,16 @@ public class SousChefTaskManager : MonoBehaviour
         }
     }
 
-    // ── AJAN GÖREVİ TAMAMLAYINCA BURAYI ÇAĞIRIR ─────────────────────
     public void OnTaskCompleted()
     {
         if (activeTask != null)
         {
-             activeTask.isCompleted = true; 
-             Debug.Log("[TaskManager] Görev Başarıyla Tamamlandı!"); 
-            // İleride buraya "Sıradaki göreve geç" gibi otomatik bir sistem eklenebilir [cite: 27]
+            activeTask.isCompleted = true;
+            Debug.Log("[TaskManager] Görev Başarıyla Tamamlandı!");
+            OnTaskChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
-    // UI'ın (Visual) anlık durumu okuyabilmesi için Getter metodu
     public SousChefTask GetActiveTask()
     {
         return activeTask;

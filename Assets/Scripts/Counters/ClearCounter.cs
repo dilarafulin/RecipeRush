@@ -41,10 +41,24 @@ public class ClearCounter : BaseCounter
             }
             else
             {
-                // B) OYUNCUNUN ELÝ BOÞ (Tezgahtakini Alma Senaryosu)
-                // Bu kod artýk baðýmsýz bir 'else' bloðunda olduðu için kusursuz çalýþacak.
+                // oyuncunun eli boþ
                 GetKitchenObject().SetKitchenObjectParent(player);
             }
         }
+    }
+
+    public override SousChefTask GetTaskForAgent(SousChefAgent agent)
+    {
+        // tezgah boþ, ajanýn elinde malzeme var
+        if (!HasKitchenObject() && agent.HasKitchenObject())
+        {
+            return new SousChefTask(SousChefCommand.DeliverToCounter, this);
+        }
+        // tezgahta malzeme var, ajanýn eli boþ
+        else if (HasKitchenObject() && !agent.HasKitchenObject())
+        {
+            return new SousChefTask(SousChefCommand.FetchIngredient, this);
+        }
+        return null;
     }
 }

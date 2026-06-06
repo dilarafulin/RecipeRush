@@ -8,26 +8,24 @@ public class SousChefCommandUI : MonoBehaviour
 {
     [Header("Referanslar")]
     [SerializeField] private SousChefTaskManager taskManager;
-    [SerializeField] private Player player;
+    [SerializeField] private SousChefAgent agent; // YENÝ: Tezgaha "Ajanýn durumu ne?" diye sorabilmek için
     [SerializeField] private LayerMask countersLayerMask;
 
     [Header("UI Elemanlarý")]
-    [SerializeField] private GameObject menuPanel;   // Menünün arka plan kutusu 
-    [SerializeField] private Transform buttonParent; // Butonlarýn içine dizileceði yer 
-    [SerializeField] private Button buttonPrefab;    // Çoðaltacaðýmýz buton þablonu 
+    [SerializeField] private GameObject menuPanel;
+    [SerializeField] private Transform buttonParent;
+    [SerializeField] private Button buttonPrefab;
 
     private bool menuOpen = false;
 
     private void Update()
     {
-        // Yeni Input Sistemi ile Mouse Sað Týk kontrolü
         if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
         {
             if (menuOpen) CloseMenu();
             else TryOpenMenu();
         }
 
-        // Yeni Input Sistemi ile ESC tuþu kontrolü
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
         {
             CloseMenu();
@@ -36,72 +34,68 @@ public class SousChefCommandUI : MonoBehaviour
 
     private void TryOpenMenu()
     {
-        // 1. Mouse imlecinin olduðu yerden ekranýn derinliðine doðru bir ýþýn (Ray) oluþtur
         Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
 
-        // 2. Bu ýþýn 100 birim boyunca gidip bir Counter'a çarpýyor mu bak
         if (Physics.Raycast(ray, out RaycastHit hit, 100f, countersLayerMask))
         {
-            // 3. Çarptýðý objedeki Counter bileþenini al
             BaseCounter counter = hit.collider.GetComponent<BaseCounter>();
 
             if (counter != null)
             {
-                // O tezgaha uygun komutlarý hazýrla
-                List<(string label, SousChefCommand cmd)> commands = GetCommandsFor(counter);
+                // ARTIK HARDCODE DEÐÝL: Tezgaha akýllý görevi soruyoruz!
+                SousChefTask smartTask = counter.GetTaskForAgent(agent);
 
-                if (commands.Count > 0)
+                // Eðer tezgah mantýklý bir görev döndürdüyse menüyü aç
+                if (smartTask != null)
                 {
-                    OpenMenu(counter, commands);
+                    OpenMenu(smartTask);
+                }
+                else
+                {
+                    Debug.Log("Bu durumda yapýlabilecek bir iþlem yok.");
+                    // Ýsteðe baðlý: Ekranda küçük bir kýrmýzý uyarý çýkartabilirsin
                 }
             }
         }
     }
 
-    // BAÐLAMA DUYARLI MANTIK (Context-Sensitive)
-    private List<(string, SousChefCommand)> GetCommandsFor(BaseCounter counter)
-    {
-        var list = new List<(string, SousChefCommand)>();
-
-        if (counter is SourceCounter)
-            list.Add(("Malzeme Getir", SousChefCommand.FetchIngredient));
-        else if (counter is CuttingCounter)
-            list.Add(("Malzemeyi Kes", SousChefCommand.ChopIngredient));
-        else if (counter is StoveCounter)
-            list.Add(("Malzemeyi Piþir", SousChefCommand.CookIngredient));
-        // Teslimat tezgahlarý (ClearCounter vb.) için eklenebilir 
-        else if (counter is ClearCounter)
-            list.Add(("Buraya Býrak", SousChefCommand.DeliverToCounter));
-
-        return list;
-    }
-
-    private void OpenMenu(BaseCounter counter, List<(string label, SousChefCommand cmd)> commands)
+    private void OpenMenu(SousChefTask task)
     {
         // 1. Önceki açýlýþtan kalan eski butonlarý temizle 
         foreach (Transform child in buttonParent)
             Destroy(child.gameObject);
 
-        // 2. Yeni butonlarý yarat 
-        foreach (var (label, cmd) in commands)
+        // 2. Yeni butonu yarat 
+        Button btn = Instantiate(buttonPrefab, buttonParent);
+
+        // Görevin türüne göre Türkçe butonu yazýsýný belirle
+        btn.GetComponentInChildren<TextMeshProUGUI>().text = GetLabelForCommand(task.command);
+
+        // 3. Týklanýnca çalýþacak kod
+        btn.onClick.AddListener(() =>
         {
-            Button btn = Instantiate(buttonPrefab, buttonParent);
-            btn.GetComponentInChildren<TextMeshProUGUI>().text = label;
+            // Doðrudan akýllý paketi yolluyoruz
+            SousChefTaskManager.Instance.GiveCommand(task.command, task.targetCounter, task.targetItemSO);
+            CloseMenu();
+        });
 
-            // CS Kuralý: Lambda Capture (Closure) için lokal kopya oluþturmak zorundayýz! 
-            SousChefCommand capturedCmd = cmd;
-            BaseCounter capturedCounter = counter;
-            btn.onClick.AddListener(() =>
-            {
-                taskManager.GiveCommand(capturedCmd, capturedCounter);
-                CloseMenu();
-            });
-        }
-
-        // 3. Menüyü mouse'un olduðu koordinata taþý ve görünür yap 
+        // 4. Menüyü mouse'un olduðu koordinata taþý ve görünür yap 
         menuPanel.transform.position = Mouse.current.position.ReadValue();
         menuPanel.SetActive(true);
         menuOpen = true;
+    }
+
+    // YENÝ: Ajanýn komutunu oyuncunun okuyabileceði güzel bir metne çevirir
+    private string GetLabelForCommand(SousChefCommand cmd)
+    {
+        switch (cmd)
+        {
+            case SousChefCommand.FetchIngredient: return "Malzemeyi Al";
+            case SousChefCommand.ChopIngredient: return "Malzemeyi Kes";
+            case SousChefCommand.CookIngredient: return "Malzemeyi Piþir";
+            case SousChefCommand.DeliverToCounter: return "Buraya Býrak";
+            default: return "Ýþlem Yap";
+        }
     }
 
     private void CloseMenu()

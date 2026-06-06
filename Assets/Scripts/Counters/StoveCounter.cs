@@ -14,11 +14,16 @@ public class StoveCounter : BaseCounter, IHasProgress
 
     public enum State
     {
-        Idle,     // Boş bekliyor
-        Frying,   // Pişiyor
-        Fried,    // Pişti, alınmayı bekliyor
-        Burned    // Yandı
+        Idle,     
+        Frying,   
+        Fried,    
+        Burned    
     }
+
+    public bool IsIdle() => state == State.Idle;
+    public bool IsBurned() => state == State.Burned;
+    public bool IsFried() => state == State.Fried;
+
 
     [SerializeField] private FryingRecipeSO[] fryingRecipeSOArray;
     [SerializeField] private BurningRecipeSO[] burningRecipeSOArray;
@@ -182,7 +187,6 @@ public class StoveCounter : BaseCounter, IHasProgress
         }
     }
 
-    // ── Tarif Arama ───────────────────────────────
     private bool HasFryingRecipeFor(KitchenObjectSO inputSO)
         => GetFryingRecipeFor(inputSO) != null;
 
@@ -200,8 +204,8 @@ public class StoveCounter : BaseCounter, IHasProgress
         return null;
     }
 
-    // Ajanın "Player" olmadan ocağa eti koyabilmesi için
-    public void InteractFromAgent(IKitchenObjectParent agent)
+
+    public override void InteractFromAgent(SousChefAgent agent)
     {
         if (!HasKitchenObject() && agent.HasKitchenObject())
         {
@@ -227,9 +231,14 @@ public class StoveCounter : BaseCounter, IHasProgress
         OnProgressChanged?.Invoke(this, new IHasProgress.OnProgressChangedEventArgs { progressNormalized = 0f });
     }
 
-    // Ajanın ocağın durumunu (State) uzaktan okuyabilmesi için Getter'lar
-    public bool IsIdle() => state == State.Idle;
+    public override SousChefTask GetTaskForAgent(SousChefAgent agent)
+    {
+        // Yanmış yemek varsa görev verme (ya da FetchIngredient ver çöpe götürsün)
+        if (HasKitchenObject() && IsBurned()) return null;
 
-    // Eğer et yanarsa da ajan onu alabilsin diye Burned durumunu da kabul ediyoruz
-    public bool IsFried() => state == State.Fried || state == State.Burned;
+        if (HasKitchenObject() || agent.HasKitchenObject())
+            return new SousChefTask(SousChefCommand.CookIngredient, this);
+
+        return null;
+    }
 }
