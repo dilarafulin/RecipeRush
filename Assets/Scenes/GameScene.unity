@@ -2201,7 +2201,7 @@ GameObject:
   m_Component:
   - component: {fileID: 457320487}
   - component: {fileID: 457320488}
-  - component: {fileID: 457320489}
+  - component: {fileID: 457320490}
   m_Layer: 0
   m_Name: TaskManager
   m_TagString: Untagged
@@ -2237,7 +2237,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SousChefTaskManager
   agent: {fileID: 2212848754936465478}
---- !u!114 &457320489
+--- !u!114 &457320490
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -2246,17 +2246,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 457320485}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 09798731ff9ee8a409f825f46d66076f, type: 3}
+  m_Script: {fileID: 11500000, guid: 45e102b91fa429f48a8ebac9930ee711, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SousChefCommandUI
-  taskManager: {fileID: 457320488}
+  m_EditorClassIdentifier: Assembly-CSharp::ChopAndPlateChain
   agent: {fileID: 2212848754936465478}
-  countersLayerMask:
-    serializedVersion: 2
-    m_Bits: 64
-  menuPanel: {fileID: 1582664567}
-  buttonParent: {fileID: 1582664568}
-  buttonPrefab: {fileID: 617595158893371550, guid: 7e2fda0ca5f32114a8963e989822aed1, type: 3}
+  cuttingCounter: {fileID: 644015416}
+  platesCounter: {fileID: 6544422784929780663, guid: e07880f974a4c5141917500f202694fa, type: 3}
+  deliveryCounter: {fileID: 4038095865030421879, guid: bca8e85ddf26da24c95e9cc369d5bea2, type: 3}
 --- !u!1 &460487575
 GameObject:
   m_ObjectHideFlags: 0
@@ -3200,6 +3196,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 2283603455533637713, guid: b07d1f3a1a781d243b348725fc74d7eb, type: 3}
   m_PrefabInstance: {fileID: 2125425567}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &644015416 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7221794575434970455, guid: b07d1f3a1a781d243b348725fc74d7eb, type: 3}
+  m_PrefabInstance: {fileID: 475491539}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 00fb72657e6c264488563cf301f48c87, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CuttingCounter
 --- !u!1 &689044171
 GameObject:
   m_ObjectHideFlags: 0
@@ -6531,6 +6538,59 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!1 &1591354492
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1591354494}
+  - component: {fileID: 1591354493}
+  m_Layer: 0
+  m_Name: TaskManagerUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1591354493
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1591354492}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 09798731ff9ee8a409f825f46d66076f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SousChefCommandUI
+  taskManager: {fileID: 457320488}
+  agent: {fileID: 2212848754936465478}
+  countersLayerMask:
+    serializedVersion: 2
+    m_Bits: 64
+  ChopChain: {fileID: 457320490}
+  menuPanel: {fileID: 1582664567}
+  buttonParent: {fileID: 1582664568}
+  buttonPrefab: {fileID: 617595158893371550, guid: 7e2fda0ca5f32114a8963e989822aed1, type: 3}
+--- !u!4 &1591354494
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1591354492}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1591741902
 GameObject:
   m_ObjectHideFlags: 0
@@ -9229,6 +9289,7 @@ SceneRoots:
   - {fileID: 832575519}
   - {fileID: 1352205259}
   - {fileID: 457320487}
+  - {fileID: 1591354494}
   - {fileID: 8110881158519911678}
   - {fileID: 428023930}
   - {fileID: 2069349752}

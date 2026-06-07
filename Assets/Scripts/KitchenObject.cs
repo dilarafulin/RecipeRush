@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class KitchenObject : MonoBehaviour
 {
@@ -11,10 +11,10 @@ public class KitchenObject : MonoBehaviour
         return kitchenObjectSO;
     }
 
-    // Ebeveyni de�i�tir (tezgahtan ele, elden tezgaha vs.)
+    // Ebeveyni değiştir (tezgahtan ele, elden tezgaha vs.)
     public void SetKitchenObjectParent(IKitchenObjectParent parent)
     {
-        // Eski ebeveynden temizle
+        // 1. Eski ebeveynden temizle
         if (kitchenObjectParent != null)
         {
             kitchenObjectParent.ClearKitchenObject();
@@ -22,7 +22,7 @@ public class KitchenObject : MonoBehaviour
 
         kitchenObjectParent = parent;
 
-        // Yeni ebeveyn zaten bir �ey tutuyorsa hata ver
+        // 2. Yeni ebeveyn zaten bir şey tutuyorsa hata ver
         if (parent.HasKitchenObject())
         {
             Debug.LogError("Ebeveynin zaten bir KitchenObject'i var!");
@@ -30,9 +30,22 @@ public class KitchenObject : MonoBehaviour
 
         parent.SetKitchenObject(this);
 
-        // Modeli ebeveynin �st�ne ta��
+        // 3. Modeli ebeveynin üstüne taşı
         transform.parent = parent.GetKitchenObjectFollowTransform();
         transform.localPosition = Vector3.zero;
+
+        // ── ML-AGENTS VE FİZİK KORUMA KİLİDİ (YENİ) ──
+        // Obje ele alındığı an sahnede bir engel oluşturmaması için Collider'ını kapatıyoruz
+        if (TryGetComponent<Collider>(out Collider col))
+        {
+            col.enabled = false;
+        }
+
+        // Eğer objede Rigidbody varsa, yerçekimiyle düşmesin veya ajanı itmesin diye Kinematic yapıyoruz
+        if (TryGetComponent<Rigidbody>(out Rigidbody rb))
+        {
+            rb.isKinematic = true;
+        }
     }
 
     public IKitchenObjectParent GetKitchenObjectParent()

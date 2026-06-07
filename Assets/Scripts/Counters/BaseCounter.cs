@@ -21,12 +21,12 @@ public class BaseCounter : MonoBehaviour, IKitchenObjectParent
     public virtual void InteractFromAgent(SousChefAgent agent)
     {
 
-        // 1. Tezgah doluysa ve ajanın eli boşsa, malzemeyi ajana ver
+        //Tezgah doluysa ve ajanın eli boşsa, malzemeyi ajana ver
         if (HasKitchenObject() && !agent.HasKitchenObject())
         {
             GetKitchenObject().SetKitchenObjectParent(agent);
         }
-        // 2. Tezgah boşsa ve ajanın eli doluysa, malzemeyi tezgaha bırak
+        //Tezgah boşsa ve ajanın eli doluysa, malzemeyi tezgaha bırak
         else if (!HasKitchenObject() && agent.HasKitchenObject())
         {
             agent.GetKitchenObject().SetKitchenObjectParent(this);

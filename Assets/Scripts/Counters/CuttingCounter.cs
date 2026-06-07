@@ -120,11 +120,14 @@ public class CuttingCounter : BaseCounter, IHasProgress
     }
     public override void InteractFromAgent(SousChefAgent agent)
     {
-        if (!HasKitchenObject()) // Tezgah boşsa ajan koysun
+        if (agent == null || !agent.HasKitchenObject()) return;
+
+        if (!HasKitchenObject()) // 1. DURUM: Kesme tahtası boşsa
         {
-            if (agent.HasKitchenObject() && HasRecipeWithInput(agent.GetKitchenObject().GetKitchenObjectSO()))
+            KitchenObject agentObj = agent.GetKitchenObject();
+            if (HasRecipeWithInput(agentObj.GetKitchenObjectSO()))
             {
-                agent.GetKitchenObject().SetKitchenObjectParent(this);
+                agentObj.SetKitchenObjectParent(this);
                 cuttingProgress = 0;
 
                 CuttingRecipeSO cuttingRecipeSO = GetCuttingRecipeSOWithInput(GetKitchenObject().GetKitchenObjectSO());
@@ -134,12 +137,35 @@ public class CuttingCounter : BaseCounter, IHasProgress
                 });
             }
         }
-        else // Tezgah doluysa ajan (kesilmiş malzemeyi) alsın
+        else // 2. DURUM: Kesme tahtasında malzeme varsa (Ajan elinde tabakla geldiğinde)
         {
-            if (!agent.HasKitchenObject())
+            // AJANIN ELİNDEKİ NESNE BİR TABAKSA
+            if (agent.GetKitchenObject() is PlateKitchenObject plateKitchenObject)
             {
+                // Hatalı PlateMerge kodunu tetiklemek yerine doğrudan güvenli transferi biz yapalım:
+                KitchenObject counterIngredient = GetKitchenObject();
+
+                // Tabağın içindeki mantığa malzemeyi eklemeyi dene
+                if (plateKitchenObject.TryAddIngredient(counterIngredient.GetKitchenObjectSO()))
+                {
+                    // TEHLİKELİ SETPARENT İŞLEMLERİNE BULAŞMADAN:
+                    // Tahtadaki malzemeyi yok et, çünkü artık tabağın içinde (mantıksal olarak) var.
+                    counterIngredient.DestroySelf();
+
+                    // İlerleme çubuğunu temizle
+                    OnProgressChanged?.Invoke(this, new IHasProgress.OnProgressChangedEventArgs { progressNormalized = 0f });
+
+                    Debug.Log("[CuttingCounter] Malzeme ajanın tabağına güvenle eklendi ve tahtadan silindi.");
+                }
+                else
+                {
+                    Debug.LogWarning("[CuttingCounter] Malzeme tabağa eklenemedi (Tarif dışı veya tabak dolu).");
+                }
+            }
+            else if (!agent.HasKitchenObject())
+            {
+                // Eğer ajanın eli boşsa tahtadaki nesneyi eline alabilirdi (Bu senaryoda eli dolu)
                 GetKitchenObject().SetKitchenObjectParent(agent);
-                // Barı sıfırla/kapat
                 OnProgressChanged?.Invoke(this, new IHasProgress.OnProgressChangedEventArgs { progressNormalized = 0f });
             }
         }

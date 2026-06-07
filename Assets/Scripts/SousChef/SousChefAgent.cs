@@ -182,24 +182,31 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
 
     private void TryInteract()
     {
-        if (interactCooldownTimer > 0f) return; // Cooldown aktifse çık
-        if (activeTask == null) return;
-        float dist = Vector3.Distance(transform.position, activeTask.targetCounter.transform.position);
-        if (dist > interactDistance) return; // Henüz yeterince yakın değilse vazgeç 
+        if (interactCooldownTimer > 0f) return;
+        if (activeTask == null || activeTask.targetCounter == null) return;
 
-        // Görev türüne göre doğru fonksiyonu çağır
+        // YÜKSEKLİĞİ YOKSAYARAK MESAFE ÖLÇÜMÜ (Sadece X ve Z eksenleri)
+        Vector3 agentPosXZ = new Vector3(transform.position.x, 0, transform.position.z);
+        Vector3 targetPosXZ = new Vector3(activeTask.targetCounter.transform.position.x, 0, activeTask.targetCounter.transform.position.z);
+
+        float dist = Vector3.Distance(agentPosXZ, targetPosXZ);
+
+        // Mesafe toleransını artırdık. Eğer hala etkileşime girmiyorsa Inspector'dan interactDistance'ı artır.
+        if (dist > interactDistance)
+        {
+            return;
+        }
+
+        Debug.Log($"[Agent] Etkileşim mesafesine girildi! Komut işleniyor: {activeTask.command}");
+
         switch (activeTask.command)
         {
-            case SousChefCommand.FetchIngredient:
-                HandleFetch(); break;
-            case SousChefCommand.ChopIngredient:
-                HandleChop(); break;
-            case SousChefCommand.CookIngredient:
-                HandleCook(); break;
+            case SousChefCommand.FetchIngredient: HandleFetch(); break;
+            case SousChefCommand.ChopIngredient: HandleChop(); break;
+            case SousChefCommand.CookIngredient: HandleCook(); break;
             case SousChefCommand.DeliverToCounter: HandleDeliver(); break;
         }
 
-       // interactCooldown = true;
         interactCooldownTimer = INTERACT_COOLDOWN;
     }
 
@@ -208,20 +215,27 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
 
         if (!HasKitchenObject() && activeTask?.targetCounter != null)
         {
-            // TEK SATIR: Tezgah ne olursa olsun eşyayı vermesini iste
+            Debug.Log("[Agent] Eşya alınmaya çalışılıyor...");
             activeTask.targetCounter.InteractFromAgent(this);
 
-            // Eğer eşyayı başarıyla aldıysak görevi bitir
-            if (HasKitchenObject()) CompleteAgentTask();
+            if (HasKitchenObject())
+            {
+                Debug.Log("[Agent] Eşya başarıyla alındı!");
+                CompleteAgentTask();
+            }
+            else
+            {
+                Debug.LogWarning("[Agent] InteractFromAgent çalıştı ama ajan eşyayı eline alamadı! Counter kodunu kontrol et.");
+            }
         }
     }
 
     // Görev bitirme kodlarını tekrar etmemek için küçük bir yardımcı fonksiyon:
     private void CompleteAgentTask()
     {
-        AddReward(1f); 
-        taskManager.OnTaskCompleted();
+        AddReward(1f);
         activeTask = null;
+        taskManager.OnTaskCompleted();
 
         //Görev bittiği an sayacı sıfırla ki ajan sonraki emre anında tepki versin!
         interactCooldownTimer = 0f;
@@ -281,19 +295,68 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
     {
         ActionSegment<int> discreteActions = actionsOut.DiscreteActions;
 
-        discreteActions[0] = 0; // Varsayılan: Dur
-        discreteActions[1] = 0; // Varsayılan: Etkileşim Yok
+        discreteActions[0] = 0;
+        discreteActions[1] = 0;
 
+        if (activeTask != null && activeTask.targetCounter != null)
+        {
+            Vector3 dirToTarget = (activeTask.targetCounter.transform.position - transform.position);
+            dirToTarget.y = 0;
+
+            // KRİTİK GÜNCELLEME: Eğer ajanın görevi doğramaksa (Chop) ve zaten dibindeyse, 
+            // gövdesini sürekli döndürmeye çalışıp kaymasına sebep olma!
+            if (activeTask.command != SousChefCommand.ChopIngredient && dirToTarget != Vector3.zero)
+            {
+                transform.forward = dirToTarget.normalized;
+            }
+
+            Vector3 agentPosXZ = new Vector3(transform.position.x, 0, transform.position.z);
+            Vector3 targetPosXZ = new Vector3(activeTask.targetCounter.transform.position.x, 0, activeTask.targetCounter.transform.position.z);
+            float distance = Vector3.Distance(agentPosXZ, targetPosXZ);
+
+            if (distance > interactDistance)
+            {
+                // Engellerin etrafından dolanma hareket kodları
+                bool preferX = Mathf.Abs(dirToTarget.x) > Mathf.Abs(dirToTarget.z);
+                float playerRadius = 0.5f;
+                float playerHeight = 0.5f;
+
+                Vector3 testDirX = new Vector3(dirToTarget.x > 0 ? 1 : -1, 0, 0);
+                Vector3 testDirZ = new Vector3(0, 0, dirToTarget.z > 0 ? 1 : -1);
+
+                bool canMoveX = !Physics.CapsuleCast(transform.position, transform.position + Vector3.up * playerHeight, playerRadius, testDirX, 0.5f, collisionLayerMask);
+                bool canMoveZ = !Physics.CapsuleCast(transform.position, transform.position + Vector3.up * playerHeight, playerRadius, testDirZ, 0.5f, collisionLayerMask);
+
+                if (preferX)
+                {
+                    if (canMoveX) discreteActions[0] = dirToTarget.x > 0 ? 4 : 3;
+                    else if (canMoveZ) discreteActions[0] = dirToTarget.z > 0 ? 1 : 2;
+                }
+                else
+                {
+                    if (canMoveZ) discreteActions[0] = dirToTarget.z > 0 ? 1 : 2;
+                    else if (canMoveX) discreteActions[0] = dirToTarget.x > 0 ? 4 : 3;
+                }
+            }
+            else
+            {
+                // Hedefe varıldı! Hareket aksiyonunu sıfırla (Kıpırdama)
+                discreteActions[0] = 0;
+
+                // Etkileşim tuşuna bas (Doğrama veya Eşya alma tetiklenir)
+                discreteActions[1] = 1;
+            }
+        }
+
+        // --- Oyuncu Manuel Müdahalesi ---
         if (Keyboard.current != null)
         {
-            // Oyuncu (Player) ile çakışmamak için I-J-K-L kullanıyoruz
-            if (Keyboard.current.iKey.isPressed) discreteActions[0] = 1; // İleri
-            if (Keyboard.current.kKey.isPressed) discreteActions[0] = 2; // Geri
-            if (Keyboard.current.jKey.isPressed) discreteActions[0] = 3; // Sol
-            if (Keyboard.current.lKey.isPressed) discreteActions[0] = 4; // Sağ
+            if (Keyboard.current.iKey.isPressed) discreteActions[0] = 1;
+            if (Keyboard.current.kKey.isPressed) discreteActions[0] = 2;
+            if (Keyboard.current.jKey.isPressed) discreteActions[0] = 3;
+            if (Keyboard.current.lKey.isPressed) discreteActions[0] = 4;
 
-            // Etkileşim için T tuşu (Player E ve F kullanıyor)
-            discreteActions[1] = Keyboard.current.tKey.isPressed ? 1 : 0;
+            if (Keyboard.current.tKey.isPressed) discreteActions[1] = 1;
         }
     }
 

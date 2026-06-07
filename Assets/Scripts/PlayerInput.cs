@@ -43,14 +43,18 @@ public class PlayerInput : MonoBehaviour
 
     private void OnDestroy()
     {
-        // Memory leak'i önlemek için unsubscribe et
-        playerInputActions.Player.Interact.performed -= Interact_performed;
-        playerInputActions.Player.InteractAlternate.performed -= InteractAlternate_performed;
+        if (playerInputActions != null)
+        {
+            // Memory leak'i önlemek için unsubscribe et
+            playerInputActions.Player.Interact.performed -= Interact_performed;
+            playerInputActions.Player.InteractAlternate.performed -= InteractAlternate_performed;
 
-        // 4. EKLENEN: Pause'u da temizle
-        playerInputActions.Player.Pause.performed -= Pause_performed;
+            // 4. EKLENEN: Pause'u da temizle
+            playerInputActions.Player.Pause.performed -= Pause_performed;
 
-        playerInputActions.Dispose();
+            // Nesneyi güvenle kapat ve hafýzadan tamamen at
+            playerInputActions.Dispose();
+        }
     }
 
     public Vector2 GetMovementVectorNormalized()

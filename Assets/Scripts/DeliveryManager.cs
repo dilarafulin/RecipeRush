@@ -38,7 +38,7 @@ public class DeliveryManager : MonoBehaviour
                 // Havuzdan rastgele bir tarif seç
                 RecipeSO waitingRecipeSO = recipeListSO.recipeSOList[UnityEngine.Random.Range(0, recipeListSO.recipeSOList.Count)];
 
-                Debug.Log(waitingRecipeSO.recipeName);
+               // Debug.Log(waitingRecipeSO.recipeName);
                 // Bekleyenler listesine ekle
                 waitingRecipeSOList.Add(waitingRecipeSO);
 

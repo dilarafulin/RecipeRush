@@ -8,40 +8,20 @@ public class ClearCounter : BaseCounter
     {
         if (!HasKitchenObject())
         {
-            // 1. SENARYO: Tezgah tamamen boþ
             if (player.HasKitchenObject())
             {
-                // Oyuncuda eþya var, tezgaha býrak
                 player.GetKitchenObject().SetKitchenObjectParent(this);
             }
         }
         else
         {
-            // 2. SENARYO: Tezgahta kesinlikle bir eþya var
             if (player.HasKitchenObject())
             {
-                // A) OYUNCUNUN DA ELÝ DOLU (Birleþtirme Senaryolarý)
-
-                // DURUM 1: Tezgahtaki þey bir Tabak mý?
-                if (GetKitchenObject() is PlateKitchenObject plateKitchenObject)
-                {
-                    if (plateKitchenObject.TryAddIngredient(player.GetKitchenObject().GetKitchenObjectSO()))
-                    {
-                        player.GetKitchenObject().DestroySelf();
-                    }
-                }
-                // DURUM 2: Oyuncunun elindeki þey bir Tabak mý?
-                else if (player.GetKitchenObject() is PlateKitchenObject playerPlateKitchenObject)
-                {
-                    if (playerPlateKitchenObject.TryAddIngredient(GetKitchenObject().GetKitchenObjectSO()))
-                    {
-                        GetKitchenObject().DestroySelf();
-                    }
-                }
+                // Ýkisinin de eli dolu 
+                TryHandlePlateMerge(player);
             }
             else
             {
-                // oyuncunun eli boþ
                 GetKitchenObject().SetKitchenObjectParent(player);
             }
         }
@@ -59,6 +39,48 @@ public class ClearCounter : BaseCounter
         {
             return new SousChefTask(SousChefCommand.FetchIngredient, this);
         }
+        else if (HasKitchenObject() && agent.HasKitchenObject())
+        {
+            if (GetKitchenObject() is PlateKitchenObject || agent.GetKitchenObject() is PlateKitchenObject)
+            {
+                return new SousChefTask(SousChefCommand.DeliverToCounter, this);
+            }
+        }
         return null;
+    }
+
+    public override void InteractFromAgent(SousChefAgent agent)
+    {
+        if (HasKitchenObject() && agent.HasKitchenObject())
+        {
+            TryHandlePlateMerge(agent);
+        }
+        else
+        {
+            base.InteractFromAgent(agent);
+        }
+    }
+
+    private bool TryHandlePlateMerge(IKitchenObjectParent interactingEntity)
+    {
+        //Tezgahtaki þey bir Tabak mý?
+        if (GetKitchenObject() is PlateKitchenObject plateKitchenObject)
+        {
+            if (plateKitchenObject.TryAddIngredient(interactingEntity.GetKitchenObject().GetKitchenObjectSO()))
+            {
+                interactingEntity.GetKitchenObject().DestroySelf();
+                return true; 
+            }
+        }
+        //Gelen varlýðýn elindeki þey bir Tabak mý?
+        else if (interactingEntity.GetKitchenObject() is PlateKitchenObject entityPlate)
+        {
+            if (entityPlate.TryAddIngredient(GetKitchenObject().GetKitchenObjectSO()))
+            {
+                GetKitchenObject().DestroySelf();
+                return true; 
+            }
+        }
+        return false; 
     }
 }
