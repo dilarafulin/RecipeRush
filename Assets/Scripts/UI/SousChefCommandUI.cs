@@ -12,6 +12,8 @@ public class SousChefCommandUI : MonoBehaviour
     [SerializeField] private LayerMask countersLayerMask;
 
     [SerializeField] private ChopAndPlateChain ChopChain;
+    [SerializeField] private CookAndPlateChain CookChain;
+
 
     [Header("UI Elemanlarý")]
     [SerializeField] private GameObject menuPanel;
@@ -81,26 +83,30 @@ public class SousChefCommandUI : MonoBehaviour
         // 3. MAKRO BUTON: Eðer týklanan tezgah malzeme üreten bir Kasaysa, "Otomasyon" butonunu ekle
         if (clickedCounter is SourceCounter sourceCounter)
         {
-            Button btnMakro = Instantiate(buttonPrefab, buttonParent);
-            btnMakro.GetComponentInChildren<TextMeshProUGUI>().text = "Ýstasyonu Yönet (Otonom)";
-
-            // Opsiyonel: Makro butonun rengini farklý yaparak (örn: Sarý) oyuncunun ayýrt etmesini saðla
-            btnMakro.GetComponent<Image>().color = new Color(1f, 0.8f, 0.2f);
-
-            btnMakro.onClick.AddListener(() =>
+            // BUTON 1: OTONOM DOÐRAMA
+            Button btnChop = Instantiate(buttonPrefab, buttonParent);
+            btnChop.GetComponentInChildren<TextMeshProUGUI>().text = "Otonom Doðrama";
+            btnChop.GetComponent<Image>().color = new Color(1f, 0.8f, 0.2f); // Sarý
+            btnChop.onClick.AddListener(() =>
             {
-                if (ChopChain != null) // Sende adý ChopAndPlateChain ise onu kullan
+                if (ChopChain != null)
                 {
-                    // 1. ADIM: Sadece hedef kasayý zincire fýsýlda (Baþlatma yok)
                     ChopChain.SetSourceCounter(sourceCounter);
-
-                    // 2. ADIM: Baþlatma iþini Yönetmene (TaskManager) býrak. 
-                    // TaskManager önce zincire kendini tanýtacak (Initialize), SONRA zinciri baþlatacak!
                     taskManager.StartChain(ChopChain);
                 }
-                else
+                CloseMenu();
+            });
+
+            // BUTON 2: OTONOM PÝÞÝRME
+            Button btnCook = Instantiate(buttonPrefab, buttonParent);
+            btnCook.GetComponentInChildren<TextMeshProUGUI>().text = "Otonom Piþirme";
+            btnCook.GetComponent<Image>().color = new Color(1f, 0.4f, 0.2f); // Turuncu (Farklý renk)
+            btnCook.onClick.AddListener(() =>
+            {
+                if (CookChain != null)
                 {
-                    Debug.LogError("Zincir referansý Inspector'dan UI'a atanmamýþ!");
+                    CookChain.SetSourceCounter(sourceCounter);
+                    taskManager.StartChain(CookChain);
                 }
                 CloseMenu();
             });

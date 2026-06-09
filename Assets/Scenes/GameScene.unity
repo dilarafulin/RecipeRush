@@ -2202,6 +2202,7 @@ GameObject:
   - component: {fileID: 457320487}
   - component: {fileID: 457320488}
   - component: {fileID: 457320490}
+  - component: {fileID: 457320491}
   m_Layer: 0
   m_Name: TaskManager
   m_TagString: Untagged
@@ -2250,9 +2251,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ChopAndPlateChain
   agent: {fileID: 2212848754936465478}
-  cuttingCounter: {fileID: 644015416}
-  platesCounter: {fileID: 6544422784929780663, guid: e07880f974a4c5141917500f202694fa, type: 3}
   deliveryCounter: {fileID: 4038095865030421879, guid: bca8e85ddf26da24c95e9cc369d5bea2, type: 3}
+--- !u!114 &457320491
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 457320485}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d24c4f7cca936f4398407a8d616b27d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CookAndPlateChain
+  agent: {fileID: 2212848754936465478}
 --- !u!1 &460487575
 GameObject:
   m_ObjectHideFlags: 0
@@ -3196,17 +3208,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 2283603455533637713, guid: b07d1f3a1a781d243b348725fc74d7eb, type: 3}
   m_PrefabInstance: {fileID: 2125425567}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &644015416 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 7221794575434970455, guid: b07d1f3a1a781d243b348725fc74d7eb, type: 3}
-  m_PrefabInstance: {fileID: 475491539}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 00fb72657e6c264488563cf301f48c87, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CuttingCounter
 --- !u!1 &689044171
 GameObject:
   m_ObjectHideFlags: 0
@@ -6573,6 +6574,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   ChopChain: {fileID: 457320490}
+  CookChain: {fileID: 457320491}
   menuPanel: {fileID: 1582664567}
   buttonParent: {fileID: 1582664568}
   buttonPrefab: {fileID: 617595158893371550, guid: 7e2fda0ca5f32114a8963e989822aed1, type: 3}
@@ -8236,6 +8238,59 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 4.0000005, y: 4, z: 0.5000006}
   m_Center: {x: 0.0000022053719, y: 2, z: 0.00000016391277}
+--- !u!1 &1975502786
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1975502788}
+  - component: {fileID: 1975502787}
+  m_Layer: 0
+  m_Name: TrainingManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1975502787
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1975502786}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dbcf2eff9b7dfc54abf0188702d156a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SousChefTrainingManager
+  agent: {fileID: 2212848754936465478}
+  taskManager: {fileID: 457320488}
+  trainingModeActive: 1
+  taskAssignDelay: 0.5
+  sourceCounters: []
+  cuttingCounter: {fileID: 0}
+  stoveCounter: {fileID: 0}
+  clearCounter: {fileID: 0}
+  platesCounter: {fileID: 0}
+--- !u!4 &1975502788
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1975502786}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -7.16845, y: 1.17942, z: -10.53617}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1983266770
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -8991,6 +9046,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 2130435636683757224, guid: 2999a03cb22511e41ae06fa693d5b95f, type: 3}
+      propertyPath: DecisionPeriod
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 2821401906777367508, guid: 2999a03cb22511e41ae06fa693d5b95f, type: 3}
       propertyPath: m_LocalPosition.x
       value: -2.9866738
@@ -9041,7 +9100,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8827234014620263482, guid: 2999a03cb22511e41ae06fa693d5b95f, type: 3}
       propertyPath: m_BehaviorType
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8827234014620263482, guid: 2999a03cb22511e41ae06fa693d5b95f, type: 3}
       propertyPath: m_BrainParameters.VectorObservationSize
@@ -9063,6 +9122,7 @@ PrefabInstance:
     - {fileID: 2550579475839187608, guid: 2999a03cb22511e41ae06fa693d5b95f, type: 3}
     - {fileID: 7381425501034741040, guid: 2999a03cb22511e41ae06fa693d5b95f, type: 3}
     - {fileID: 2778567571691680885, guid: 2999a03cb22511e41ae06fa693d5b95f, type: 3}
+    - {fileID: 3463133295378319888, guid: 2999a03cb22511e41ae06fa693d5b95f, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
@@ -9296,8 +9356,9 @@ SceneRoots:
   - {fileID: 1592978155}
   - {fileID: 1107589970}
   - {fileID: 120574341}
-  - {fileID: 1514662133}
   - {fileID: 2212848754936465477}
+  - {fileID: 1514662133}
   - {fileID: 2114645449}
   - {fileID: 1381675063}
   - {fileID: 965444931}
+  - {fileID: 1975502788}

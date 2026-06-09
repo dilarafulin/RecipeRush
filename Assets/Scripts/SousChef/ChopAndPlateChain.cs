@@ -58,25 +58,4 @@ public class ChopAndPlateChain : SousChefChainBase
         }
     }
 
-    // Sahnedeki en yakin T tipindeki counter'i bulur
-    // filter: opsiyonel kosul (ornek: bos olmali, dolu olmali vs.)
-    private T FindNearest<T>(System.Func<T, bool> filter = null) where T : BaseCounter
-    {
-        T[] all = Object.FindObjectsByType<T>(FindObjectsSortMode.None);
-        T nearest = null;
-        float minDist = float.MaxValue;
-        Vector3 agentPos = agent.transform.position;
-
-        foreach (T counter in all)
-        {
-            if (filter != null && !filter(counter)) continue;
-            float dist = Vector3.Distance(agentPos, counter.transform.position);
-            if (dist < minDist)
-            {
-                minDist = dist;
-                nearest = counter;
-            }
-        }
-        return nearest;
-    }
 }

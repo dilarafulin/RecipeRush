@@ -120,10 +120,13 @@ public class CuttingCounter : BaseCounter, IHasProgress
     }
     public override void InteractFromAgent(SousChefAgent agent)
     {
-        if (agent == null || !agent.HasKitchenObject()) return;
+        if (agent == null) return;
 
         if (!HasKitchenObject()) // 1. DURUM: Kesme tahtası boşsa
         {
+            // Tahta boş, ajanın da eli boşsa yapacak bir şey yok
+            if (!agent.HasKitchenObject()) return;
+
             KitchenObject agentObj = agent.GetKitchenObject();
             if (HasRecipeWithInput(agentObj.GetKitchenObjectSO()))
             {
@@ -137,39 +140,28 @@ public class CuttingCounter : BaseCounter, IHasProgress
                 });
             }
         }
-        else // 2. DURUM: Kesme tahtasında malzeme varsa (Ajan elinde tabakla geldiğinde)
+        else // 2. DURUM: Kesme tahtasında malzeme varsa
         {
-            // AJANIN ELİNDEKİ NESNE BİR TABAKSA
-            if (agent.GetKitchenObject() is PlateKitchenObject plateKitchenObject)
+            if (agent.HasKitchenObject()) // Ajanın eli doluysa (Tabak getirdiyse)
             {
-                // Hatalı PlateMerge kodunu tetiklemek yerine doğrudan güvenli transferi biz yapalım:
-                KitchenObject counterIngredient = GetKitchenObject();
-
-                // Tabağın içindeki mantığa malzemeyi eklemeyi dene
-                if (plateKitchenObject.TryAddIngredient(counterIngredient.GetKitchenObjectSO()))
+                if (agent.GetKitchenObject() is PlateKitchenObject plateKitchenObject)
                 {
-                    // TEHLİKELİ SETPARENT İŞLEMLERİNE BULAŞMADAN:
-                    // Tahtadaki malzemeyi yok et, çünkü artık tabağın içinde (mantıksal olarak) var.
-                    counterIngredient.DestroySelf();
-
-                    // İlerleme çubuğunu temizle
-                    OnProgressChanged?.Invoke(this, new IHasProgress.OnProgressChangedEventArgs { progressNormalized = 0f });
-
-                    Debug.Log("[CuttingCounter] Malzeme ajanın tabağına güvenle eklendi ve tahtadan silindi.");
-                }
-                else
-                {
-                    Debug.LogWarning("[CuttingCounter] Malzeme tabağa eklenemedi (Tarif dışı veya tabak dolu).");
+                    KitchenObject counterIngredient = GetKitchenObject();
+                    if (plateKitchenObject.TryAddIngredient(counterIngredient.GetKitchenObjectSO()))
+                    {
+                        counterIngredient.DestroySelf();
+                        OnProgressChanged?.Invoke(this, new IHasProgress.OnProgressChangedEventArgs { progressNormalized = 0f });
+                    }
                 }
             }
-            else if (!agent.HasKitchenObject())
+            else // AJANIN ELİ BOŞSA (İşte ekmeği geri alma kısmı burası!)
             {
-                // Eğer ajanın eli boşsa tahtadaki nesneyi eline alabilirdi (Bu senaryoda eli dolu)
                 GetKitchenObject().SetKitchenObjectParent(agent);
                 OnProgressChanged?.Invoke(this, new IHasProgress.OnProgressChangedEventArgs { progressNormalized = 0f });
             }
         }
     }
+
     public override SousChefTask GetTaskForAgent(SousChefAgent agent)
     {
         if (HasKitchenObject() && !agent.HasKitchenObject())
