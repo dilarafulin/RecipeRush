@@ -1,12 +1,10 @@
 using UnityEngine;
 
+// Hazırlık makrosu: kesilmiş malzemeyi bir tabağa koyup hazır tabağı boş tezgaha bırakır.
+// Teslimat bilinçli olarak YOK — tek malzemelik tabak siparişlerle nadiren eşleşir;
+// tam sipariş teslimatı RecipeChain'in işi.
 public class ChopAndPlateChain : SousChefChainBase
 {
-    // deliveryCounter hala sabit kalabilir cunku teslimat noktasi genelde tekdir
-    // Ama istersen onu da dinamik yapabiliriz
-    [Header("Sabit Referanslar")]
-    [SerializeField] private BaseCounter deliveryCounter;
-
     private BaseCounter dynamicSourceCounter;
 
     public void SetSourceCounter(BaseCounter clickedSourceCounter)
@@ -16,39 +14,37 @@ public class ChopAndPlateChain : SousChefChainBase
 
     public override void ExecuteStep(int step)
     {
+        // Hedef tezgah o an müsait değilse adımlar iptal etmez, açılana kadar bekler
         switch (step)
         {
-            case 0:
-                // 1. ADIM: Kaynaktan malzemeyi al (zaten dinamikti)
-                taskManager.GiveCommand(SousChefCommand.FetchIngredient, dynamicSourceCounter);
+            case 0: // Kaynaktan malzemeyi al
+                GiveWhenAvailable(0, SousChefCommand.FetchIngredient,
+                    () => dynamicSourceCounter, "Kaynaktan al");
                 break;
 
-            case 1:
-                // 2. ADIM: Bos bir kesme tahtasi bul ve malzemeyi birak
-                CuttingCounter emptyCutter = FindNearest<CuttingCounter>(c => !c.HasKitchenObject());
-                if (emptyCutter == null) { Debug.LogWarning("[Chain] Bos kesme tahtasi bulunamadi!"); Cancel(); return; }
-                taskManager.GiveCommand(SousChefCommand.DeliverToCounter, emptyCutter);
+            case 1: // Boş kesme tahtasına bırak
+                GiveWhenAvailable(1, SousChefCommand.DeliverToCounter,
+                    () => FindNearest<CuttingCounter>(c => !c.HasKitchenObject()), "Tahtaya bırak");
                 break;
 
-            case 2:
-                // 3. ADIM: Uzerinde malzeme olan kesme tahtasini bul ve kes
-                CuttingCounter fullCutter = FindNearest<CuttingCounter>(c => c.HasKitchenObject());
-                if (fullCutter == null) { Debug.LogWarning("[Chain] Malzemeli kesme tahtasi bulunamadi!"); Cancel(); return; }
-                taskManager.GiveCommand(SousChefCommand.ChopIngredient, fullCutter);
+            case 2: // Malzemeli tahtayı bul ve kes
+                GiveWhenAvailable(2, SousChefCommand.ChopIngredient,
+                    () => FindNearest<CuttingCounter>(c => c.HasKitchenObject()), "Kes");
                 break;
 
-            case 3:
-                // 4. ADIM: Temiz bir tabak al
-                BaseCounter platesCounter = FindNearest<PlatesCounter>();
-                if (platesCounter == null) { Debug.LogWarning("[Chain] Tabaklik bulunamadi!"); Cancel(); return; }
-                taskManager.GiveCommand(SousChefCommand.FetchIngredient, platesCounter);
+            case 3: // Temiz tabak al
+                GiveWhenAvailable(3, SousChefCommand.FetchIngredient,
+                    () => FindNearest<PlatesCounter>(), "Tabak al");
                 break;
 
-            case 4:
-                // 5. ADIM: Tabagi kesme tahtasina gotur (PlateMerge otomatik calisacak)
-                CuttingCounter cutterWithItem = FindNearest<CuttingCounter>(c => c.HasKitchenObject());
-                if (cutterWithItem == null) { Debug.LogWarning("[Chain] Malzemeli kesme tahtasi bulunamadi!"); Cancel(); return; }
-                taskManager.GiveCommand(SousChefCommand.DeliverToCounter, cutterWithItem);
+            case 4: // Tabağı tahtaya götür (merge)
+                GiveWhenAvailable(4, SousChefCommand.DeliverToCounter,
+                    () => FindNearest<CuttingCounter>(c => c.HasKitchenObject()), "Tabağı tahtaya götür");
+                break;
+
+            case 5: // Hazır tabağı boş tezgaha bırak (boş yer açılana kadar bekler)
+                GiveWhenAvailable(5, SousChefCommand.DeliverToCounter,
+                    () => FindNearest<ClearCounter>(c => !c.HasKitchenObject()), "Hazır tabağı bırak");
                 break;
 
             default:

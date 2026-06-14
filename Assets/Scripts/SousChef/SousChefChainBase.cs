@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System.Collections;
 
 public abstract class SousChefChainBase : MonoBehaviour
 {
@@ -35,7 +36,72 @@ public abstract class SousChefChainBase : MonoBehaviour
         ExecuteStep(currentStep);
     }
 
+    // Override sonrası: adımı İLERLETMEDEN mevcut adımı yeniden ver
+    // (hedefler resolveTarget ile o anki duruma göre yeniden çözülür)
+    public virtual void ResumeCurrentStep()
+    {
+        if (!IsRunning()) return;
+        Debug.Log($"[Chain] ▶ Devam: adım {currentStep} yeniden veriliyor");
+        ExecuteStep(currentStep);
+    }
+
+    // Sıraya alınmış override için: mevcut adım bitti say, ama bir sonrakini ÇALIŞTIRMA
+    // (önce override koşacak, o bitince ResumeCurrentStep bu adımı verecek)
+    public virtual void AdvanceStepOnly()
+    {
+        if (!IsRunning()) return;
+        currentStep++;
+        Debug.Log($"[Chain] Adım ilerletildi (çalıştırılmadan) → {currentStep}");
+    }
+
+    // Bir makro araya girip yarıda kestikten sonra ana zincir buradan devam eder.
+    // Varsayılan: mevcut adımı yeniden ver. RecipeChain bunu ezip duruma göre
+    // (tabağın içeriğine göre) baştan planlar — çünkü makro el durumunu değiştirmiş olabilir.
+    public virtual void ResumeFromState()
+    {
+        ResumeCurrentStep();
+    }
+
     public bool IsRunning() => currentStep >= 0;
+
+    // Override ürününü bırakmak için en yakın boş tezgah (TaskManager kullanır)
+    public BaseCounter FindDropCounter() => FindNearest<ClearCounter>(c => !c.HasKitchenObject());
+
+    // Bir adımın hedefi (örn. boş tezgah) ŞU AN müsait değilse: İPTAL ETME, açılana
+    // kadar BEKLE ve tekrar dene. Ajan bu sırada (varsa elindekiyle) boşta durur.
+    // Tüm tezgahlar dolu → bir yer boşalınca zincir kaldığı adımdan devam eder.
+    protected void GiveWhenAvailable(int step, SousChefCommand cmd,
+                                     System.Func<BaseCounter> resolver, string label)
+    {
+        BaseCounter target = resolver();
+        if (target != null)
+        {
+            Debug.Log($"[Chain] {label} → {target.name}");
+            taskManager.GiveCommand(cmd, target);
+            return;
+        }
+        Debug.Log($"[Chain] Hedef müsait değil, açılması bekleniyor: {label}");
+        StartCoroutine(WaitThenGive(step, cmd, resolver, label));
+    }
+
+    private IEnumerator WaitThenGive(int step, SousChefCommand cmd,
+                                    System.Func<BaseCounter> resolver, string label)
+    {
+        // Adım değişmediği (zincir hâlâ bu adımda) ve çalışır olduğu sürece bekle
+        while (IsRunning() && currentStep == step)
+        {
+            yield return new WaitForSeconds(0.5f);
+            if (!IsRunning() || currentStep != step) yield break;
+
+            BaseCounter target = resolver();
+            if (target != null)
+            {
+                Debug.Log($"[Chain] Hedef açıldı → {label} → {target.name}");
+                taskManager.GiveCommand(cmd, target);
+                yield break;
+            }
+        }
+    }
 
     public virtual void Cancel() => currentStep = -1;
 

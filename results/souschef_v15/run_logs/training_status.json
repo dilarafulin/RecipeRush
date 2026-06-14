@@ -1,0 +1,47 @@
+{
+    "SousChefBehavior": {
+        "checkpoints": [
+            {
+                "steps": 46794,
+                "file_path": "results\\souschef_v15\\SousChefBehavior\\SousChefBehavior-46794.onnx",
+                "reward": -1.0495000518858433,
+                "creation_time": 1781098910.893804,
+                "auxillary_file_paths": [
+                    "results\\souschef_v15\\SousChefBehavior\\SousChefBehavior-46794.pt"
+                ]
+            },
+            {
+                "steps": 75863,
+                "file_path": "results\\souschef_v15\\SousChefBehavior\\SousChefBehavior-75863.onnx",
+                "reward": null,
+                "creation_time": 1781100415.0208695,
+                "auxillary_file_paths": [
+                    "results\\souschef_v15\\SousChefBehavior\\SousChefBehavior-75863.pt"
+                ]
+            },
+            {
+                "steps": 135776,
+                "file_path": "results\\souschef_v15\\SousChefBehavior\\SousChefBehavior-135776.onnx",
+                "reward": null,
+                "creation_time": 1781107332.2008903,
+                "auxillary_file_paths": [
+                    "results\\souschef_v15\\SousChefBehavior\\SousChefBehavior-135776.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 135776,
+            "file_path": "results\\souschef_v15\\SousChefBehavior.onnx",
+            "reward": null,
+            "creation_time": 1781107332.2008903,
+            "auxillary_file_paths": [
+                "results\\souschef_v15\\SousChefBehavior\\SousChefBehavior-135776.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.12.0+cpu"
+    }
+}

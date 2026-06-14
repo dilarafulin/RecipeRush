@@ -15,8 +15,12 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
     [SerializeField] private LayerMask collisionLayerMask;
 
     [Header("RL Ayarları")]
-    [SerializeField] private float maxSceneDistance = 15f; 
-    [SerializeField] private float maxEpisodeTime = 30f;   
+    [SerializeField] private float maxSceneDistance = 15f;
+    [SerializeField] private float maxEpisodeTime = 30f;
+    // Boş bırakılırsa sahnedeki başlangıç pozisyonu kullanılır.
+    // Birden çok nokta vermek hem genellemeyi sağlar hem de engel kaynaklı
+    // yerel minimumları kırar (ajan bazen hedefe yakın doğup tamamlamayı keşfeder)
+    [SerializeField] private Transform[] trainingSpawnPoints;
 
 
     private SousChefTask activeTask;
@@ -32,81 +36,186 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
 
     //Delta Odul
     private float lastDistToTarget = float.MaxValue;
-    // Delta ödülünün toplamını sınırlamak için
-    private float totalApproachReward = 0f;
-    private const float MAX_APPROACH_REWARD = 0.3f; // Yaklaşma ödülü max bu kadar
 
     // Etkileşim alanına ilk girişte tek seferlik ödül
     private bool hasEnteredInteractRange = false;
 
+    // Menzil içinde interact'e basma ödülü görev başına tek sefer (farm engeli)
+    private bool hasRewardedInteractPress = false;
+
+    // Bölüm başında ajanın döneceği spawn noktası
+    private Vector3 startPosition;
+    private Quaternion startRotation;
+
+    // Navigasyon güvenlik ağı (yalnızca oyunda/inference'ta, eğitimde KAPALI):
+    // RL politikası ~%4 oranında duvar/köşe dolaşmayı çözemeyip titriyor/kilitleniyor;
+    // hedefe yaklaşma izlenir, takılınca açık+hedefe-doğru bir yöne yönlendirilir
+    private float bestDistToTarget;
+    private float noProgressTimer;
+    private float escapeTimer;
+    private Vector3 escapeMoveDir;
+
+
+    // Cook: yürüme + 3 etkileşim + kızartma süresi içerir, diğerlerinden uzun bütçe ister
+    private float currentTaskTimeLimit;
+
+    // Etkileşim mesafesi pivot yerine collider'ın en yakın noktasına ölçülür;
+    // çok karoluk tezgahlarda (ocak adası) pivot 3 birimden uzak kalabiliyor
+    private Collider targetCollider;
+
+    private float DistanceToTargetXZ()
+    {
+        if (activeTask?.targetCounter == null) return float.MaxValue;
+
+        Vector3 targetPoint = targetCollider != null
+            ? targetCollider.ClosestPoint(transform.position)
+            : activeTask.targetCounter.transform.position;
+
+        Vector3 agentXZ = new Vector3(transform.position.x, 0, transform.position.z);
+        targetPoint.y = 0;
+        return Vector3.Distance(agentXZ, targetPoint);
+    }
 
     public void SetTask(SousChefTask task)
     {
         activeTask = task;
+        targetCollider = task?.targetCounter != null
+            ? task.targetCounter.GetComponentInChildren<Collider>()
+            : null;
+        currentTaskTimeLimit = task != null && task.command == SousChefCommand.CookIngredient
+            ? maxEpisodeTime * 2f
+            : maxEpisodeTime;
         // Her yeni görevde sıfırla — zincirde adım değişince timer bitmemeli
         episodeTimer = 0f;
         lastDistToTarget = float.MaxValue;
-        totalApproachReward = 0f;
         hasEnteredInteractRange = false;
+        hasRewardedInteractPress = false;
         interactCooldownTimer = 0f;
+        bestDistToTarget = float.MaxValue;
+        noProgressTimer = 0f;
+        escapeTimer = 0f;
+    }
+
+    public override void Initialize()
+    {
+        startPosition = transform.position;
+        startRotation = transform.rotation;
     }
 
     public override void OnEpisodeBegin()
     {
+        // Pozisyon resetlenmezse sınır dışına çıkan ajan sonsuz -1 döngüsüne girer
+        if (trainingSpawnPoints != null && trainingSpawnPoints.Length > 0)
+        {
+            Transform spawn = trainingSpawnPoints[Random.Range(0, trainingSpawnPoints.Length)];
+            transform.position = spawn.position;
+            transform.rotation = spawn.rotation;
+        }
+        else
+        {
+            transform.position = startPosition;
+            transform.rotation = startRotation;
+        }
+
         episodeTimer = 0f;
         currentMoveDir = Vector3.zero;
         lastDistToTarget = float.MaxValue;
-        totalApproachReward = 0f;
         hasEnteredInteractRange = false;
+        hasRewardedInteractPress = false;
     }
 
-    // ── GÖZLEMLER: 11 adet, her zaman sabit ──────────────────────
+    // ── GÖZLEMLER: 13 adet, her zaman sabit ──────────────────────
+    // YÖNTEM 1: Yön vektörü VERİLMİYOR. Ajan ham koordinatlardan
+    // uzamsal ilişkiyi kendi öğrenir (gerçek RL navigasyonu).
+
     public override void CollectObservations(VectorSensor sensor)
     {
         if (activeTask == null || activeTask.targetCounter == null)
         {
-            // Görev yoksa 11 sıfır — sayı ASLA değişmemeli
-            for (int i = 0; i < 11; i++) sensor.AddObservation(0f);
+            // Görev yoksa 13 sıfır — sayı ASLA değişmemeli
+            for (int i = 0; i < 13; i++) sensor.AddObservation(0f);
             return;
         }
 
         Vector3 agentPos = transform.position;
         Vector3 targetPos = activeTask.targetCounter.transform.position;
+        Vector3 relativePos = targetPos - agentPos;
 
-        // 1-3: Hedefe normalize yön vektörü
-        Vector3 dirToTarget = (targetPos - agentPos).normalized;
-        sensor.AddObservation(dirToTarget); // x, y, z → 3 değer
+        // 1-2: Ajanın kendi pozisyonu (normalize)
+        // Yön vektörü VERMİYORUZ — ajan ilişkiyi kendi kursun
 
-        // 4: Hedefe uzaklık (0-1 normalize, sahne boyutuna göre)
+        sensor.AddObservation(relativePos.x / maxSceneDistance); 
+        sensor.AddObservation(relativePos.z / maxSceneDistance);
+
+        // 3-4: Hedefin pozisyonu (normalize)
+        sensor.AddObservation(targetPos.x / maxSceneDistance);
+        sensor.AddObservation(targetPos.z / maxSceneDistance);
+
+        // 5: Hedefe uzaklık (0-1 normalize)
         float dist = Vector3.Distance(agentPos, targetPos);
         sensor.AddObservation(Mathf.Clamp01(dist / maxSceneDistance));
 
-        // 5: Elde malzeme var mı
+        // 6: Etkileşim mesafesinde mi? (YÖNTEM 3 için kritik gözlem)
+        // TryInteract ile AYNI ölçüm — gözlem ile eylem kapısı tutarlı olmalı
+        bool canInteractNow = DistanceToTargetXZ() <= interactDistance;
+        sensor.AddObservation(canInteractNow ? 1f : 0f);
+
+        // 7: Elde malzeme var mı
         sensor.AddObservation(HasKitchenObject() ? 1f : 0f);
 
-        // 6: Hedef tezgah dolu mu
+        // 8: Hedef tezgah dolu mu
         sensor.AddObservation(activeTask.targetCounter.HasKitchenObject() ? 1f : 0f);
 
-        // 7-11: Aktif komut one-hot — ajan ne yapacağını bilsin
+        // 9-13: Aktif komut one-hot
         sensor.AddObservation(activeTask.command == SousChefCommand.FetchIngredient ? 1f : 0f);
         sensor.AddObservation(activeTask.command == SousChefCommand.ChopIngredient ? 1f : 0f);
         sensor.AddObservation(activeTask.command == SousChefCommand.CookIngredient ? 1f : 0f);
         sensor.AddObservation(activeTask.command == SousChefCommand.DeliverToCounter ? 1f : 0f);
         sensor.AddObservation(activeTask.command == SousChefCommand.Idle ? 1f : 0f);
-
-        // Toplam: 11 gözlem
+        // Toplam: 13 gözlem
     }
 
 
     public override void OnActionReceived(ActionBuffers actions)
     {
-        // 1. ZAMAN AŞIMI
-        episodeTimer += Time.fixedDeltaTime;
-        if (episodeTimer >= maxEpisodeTime)
+        // SINIR DIŞI + ZAMAN AŞIMI: eğitim güvenlikleri, SADECE eğitimde geçerli.
+        // Oyunda (inference) bunlar uzun navigasyon / pişirme beklemesinde zinciri
+        // haksız yere keserdi; orada stuck-escape ve diğer güvenlikler yeterli.
+        if (Academy.Instance.IsCommunicatorOn)
         {
-            // Sert ceza değil — öğrenmeyi bloke etmesin
-            AddReward(-0.3f);
-            EndEpisode();
+            if (Mathf.Abs(transform.position.x) > 23f || Mathf.Abs(transform.position.z) > 23f)
+            {
+                AddReward(-1f);
+                FailActiveTask();
+                EndEpisode(); // hemen spawn'a dönmesi gerekiyor
+                return;
+            }
+
+            // Görev düşürülür, episode'u yeni görev ataması kapatır. Görev temizlenmezse
+            // ajan aynı (imkânsız olabilecek) göreve sonsuza dek yeniden başlar.
+            episodeTimer += Time.fixedDeltaTime;
+            if (activeTask != null && episodeTimer >= currentTaskTimeLimit)
+            {
+                AddReward(-0.3f); // sert değil — öğrenmeyi bloke etmesin
+                FailActiveTask();
+                return;
+            }
+        }
+
+        // KURTARILAMAZ DURUM: yemek yandıysa görev tamamlanamaz (her iki modda da geçerli)
+        if (activeTask?.command == SousChefCommand.CookIngredient
+            && activeTask.targetCounter is StoveCounter burnedStove && burnedStove.IsBurned())
+        {
+            AddReward(-0.5f);
+            FailActiveTask();
+            return;
+        }
+
+        // Görev yoksa hareket etme. Model, eğitimde hiç görmediği "boş gözlem"
+        // durumunda rastgele yürür; idle'a zorla (oyun başı / görevler arası / override)
+        if (activeTask == null)
+        {
+            currentMoveDir = Vector3.zero;
             return;
         }
 
@@ -121,22 +230,39 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
             case 4: currentMoveDir = Vector3.right; break;
         }
 
-        // 3. ETKİLEŞİM
-        int interactAction = actions.DiscreteActions[1];
+        // Hedefe varıldıysa (etkileşim menzilinde) navigasyona gerek yok — hareketi
+        // bastır ki beklerken/keserken/etkileşimde stokastik örnekleme titremesi
+        // (sağ-sol) olmasın. Uzaktayken (navigasyon) etkilenmez.
+        if (DistanceToTargetXZ() <= interactDistance)
+            currentMoveDir = Vector3.zero;
 
-        // Uzakta E'ye basarsa küçük ceza — "önce yaklaş" öğrensin
+        // OYUNDA: pişen yemeği yanmadan OTOMATİK al — interact basışını bekleme,
+        // böylece "piştikten sonra geç basınca yanma" penceresi tamamen kapanır.
+        // RL'in yaptığı kısımlar (gitme/koyma/başlatma) korunur; sadece toplama güvenceye alınır.
+        if (!Academy.Instance.IsCommunicatorOn
+            && activeTask.command == SousChefCommand.CookIngredient
+            && DistanceToTargetXZ() <= interactDistance
+            && TryAutoCollectFried())
+            return;
+
+        // 3. ETKİLEŞİM (YÖNTEM 3: kararı ajan verir, doğru zamanlama ödüllenir)
+        int interactAction = actions.DiscreteActions[1];
         if (interactAction == 1 && activeTask?.targetCounter != null)
         {
-            float quickDist = Vector3.Distance(
-                new Vector3(transform.position.x, 0, transform.position.z),
-                new Vector3(activeTask.targetCounter.transform.position.x, 0,
-                            activeTask.targetCounter.transform.position.z));
-            if (quickDist > interactDistance)
-                AddReward(-0.005f);
+            if (DistanceToTargetXZ() <= interactDistance)
+            {
+                // Görev başına TEK SEFER — yoksa menzilde spamlemek farm edilir
+                if (!hasRewardedInteractPress)
+                {
+                    Debug.Log("[Agent] Etkileşim mesafesinde +0.3");
+                    AddReward(0.3f);
+                    hasRewardedInteractPress = true;
+                }
+            }
+            // Uzakta basmaya ceza YOK — anlık ceza, ajan menzildeki +0.3/+1'i
+            // keşfedemeden "interact'e asla basma" politikasına çökmesine yol açıyor
         }
-
         if (interactAction == 1) TryInteract();
-
         // 4. SÜREÇ ÖDÜLLERİ
         ApplyProcessRewards();
     }
@@ -144,55 +270,60 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
     private void ApplyProcessRewards()
     {
         // A. Adım cezası — daha küçük, öğrenmeyi engellemesin
-        AddReward(-0.0005f);
+        AddReward(-0.0001f);
 
         if (activeTask?.targetCounter == null) return;
 
         float dist = Vector3.Distance(transform.position,
                                       activeTask.targetCounter.transform.position);
 
-        // B. Delta ödülü — SINIRLIYIZ, farming engellenir
-        if (totalApproachReward < MAX_APPROACH_REWARD)
+        // İlk adımda referans mesafeyi kur — yoksa MaxValue ile dev delta
+        // oluşur ve tüm yaklaşma bütçesi bedavaya tükenir
+        if (lastDistToTarget == float.MaxValue)
         {
-            float distanceDelta = lastDistToTarget - dist;
-            if (distanceDelta > 0.01f)
-            {
-                float reward = distanceDelta * 0.05f; // Katsayı düşürüldü
-                float clampedReward = Mathf.Min(reward,
-                                                MAX_APPROACH_REWARD - totalApproachReward);
-                AddReward(clampedReward);
-                totalApproachReward += clampedReward;
-            }
+            lastDistToTarget = dist;
+            return;
         }
+
+        // B. Potansiyel tabanlı shaping: yaklaşmak +, uzaklaşmak −.
+        // Simetrik olduğu için gidiş-dönüş net 0 → farm imkânsız, cap gereksiz.
+        // Tek yönlü+cap'li eski sürümde bütçe tükenince hedefe çekim kayboluyor,
+        // ajan uzun görevlerde (Cook) hedefin dibinden geri dönüp geziniyordu
+        AddReward((lastDistToTarget - dist) * 0.05f);
         lastDistToTarget = dist;
 
-        // C. Etkileşim alanına ilk girişte tek seferlik ödül
-        if (dist <= interactDistance && !hasEnteredInteractRange)
+        // C. Etkileşim alanına ilk girişte tek seferlik ödül (gate ile aynı ölçüm)
+        if (DistanceToTargetXZ() <= interactDistance && !hasEnteredInteractRange)
         {
             AddReward(0.05f);
             hasEnteredInteractRange = true;
         }
-        else if (dist > interactDistance + 0.5f)
-        {
-            hasEnteredInteractRange = false; // Uzaklaşırsa sıfırla
-        }
+        // else if (dist > interactDistance + 0.5f)
+       // {   hasEnteredInteractRange = false; // Uzaklaşırsa sıfırla }
     }
 
 
     // ── FİZİKSEL HAREKET ──────────────────────────────────────────
-    private void Update()
+    // Kararlar fizik adımında alındığı için hareket de FixedUpdate'te;
+    // Update'te kalırsa eğitimdeki time-scale ile davranış kayar
+    private void FixedUpdate()
     {
         if (interactCooldownTimer > 0f)
-            interactCooldownTimer -= Time.deltaTime;
+            interactCooldownTimer -= Time.fixedDeltaTime;
 
-        float moveDistance = moveSpeed * Time.deltaTime;
+        // Politika duvarda/köşede takılırsa currentMoveDir'i kaçış yönüyle ezer
+        if (activeTask != null)
+            ApplyStuckEscape();
+
+        float moveDistance = moveSpeed * Time.fixedDeltaTime;
         float playerRadius = 0.5f;
-        float playerHeight = 0.5f;
+        float playerHeight = 2f;              // 0.5f'ti, 2f yap
+        float castDistance = moveDistance + 0.5f;  // fazladan kontrol payı
 
         bool canMove = !Physics.CapsuleCast(
             transform.position,
             transform.position + Vector3.up * playerHeight,
-            playerRadius, currentMoveDir, moveDistance, collisionLayerMask);
+            playerRadius, currentMoveDir, castDistance, collisionLayerMask);
 
         if (!canMove)
         {
@@ -215,7 +346,9 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
         if (canMove)
             transform.position += currentMoveDir * moveDistance;
 
-        isWalking = currentMoveDir != Vector3.zero;
+        // İSTENEN yöne değil GERÇEK harekete bağla — engele dayanıp ilerleyemezken
+        // (canMove false) ya da beklerken yürüme animasyonu oynamasın
+        isWalking = canMove && currentMoveDir != Vector3.zero;
 
         Vector3 lookDir = currentMoveDir != Vector3.zero
             ? currentMoveDir
@@ -226,7 +359,83 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
         lookDir.y = 0;
         if (lookDir != Vector3.zero)
             transform.rotation = Quaternion.Slerp(transform.rotation,
-                Quaternion.LookRotation(lookDir), rotationSpeed * Time.deltaTime);
+                Quaternion.LookRotation(lookDir), rotationSpeed * Time.fixedDeltaTime);
+    }
+
+    // Yalnızca oyunda devreye girer; eğitimde ajan navigasyonu kendi öğrenmeli
+    private void ApplyStuckEscape()
+    {
+        if (Academy.Instance.IsCommunicatorOn) return; // eğitim sırasında kapalı
+
+        float distNow = DistanceToTargetXZ();
+
+        // Hedefe varmışsa hareket beklenmez (ocakta bekleme vb.) — kilitlenme sayma
+        if (distNow <= interactDistance)
+        {
+            bestDistToTarget = distNow;
+            noProgressTimer = 0f;
+            escapeTimer = 0f;
+            return;
+        }
+
+        if (bestDistToTarget == float.MaxValue) bestDistToTarget = distNow;
+
+        // Kaçış sürüyor: seçilen tek yöne KARARLI kay; hedefe belirgin yaklaşınca bitir
+        if (escapeTimer > 0f)
+        {
+            escapeTimer -= Time.fixedDeltaTime;
+            currentMoveDir = escapeMoveDir;
+            if (distNow < bestDistToTarget - 0.3f)
+            {
+                bestDistToTarget = distNow;
+                noProgressTimer = 0f;
+                escapeTimer = 0f;
+            }
+            return;
+        }
+
+        // İLERLEME = hedefe YAKLAŞMA (sadece "hareket etti" değil) — böylece
+        // duvarda bir sağ bir sol titreyen "gezinme/sıkışma" da yakalanır
+        if (distNow < bestDistToTarget - 0.05f)
+        {
+            bestDistToTarget = distNow;
+            noProgressTimer = 0f;
+        }
+        else
+        {
+            noProgressTimer += Time.fixedDeltaTime;
+            if (noProgressTimer > 1.2f) // 1.2 sn hedefe yaklaşamadı → kilitli/gezgin
+            {
+                escapeMoveDir = ChooseEscapeDirection();
+                escapeTimer = 1.5f;
+                noProgressTimer = 0f;
+            }
+        }
+    }
+
+    // 4 ana yön içinde AÇIK olanlar arasından hedefe en çok yaklaştıranı seç —
+    // engelin/duvarın kenarı boyunca amaçlı kayma gibi görünür, rastgele savrulma değil
+    private Vector3 ChooseEscapeDirection()
+    {
+        Vector3 toTarget = activeTask.targetCounter.transform.position - transform.position;
+        toTarget.y = 0;
+        toTarget.Normalize();
+
+        Vector3 best = Vector3.zero;
+        float bestScore = float.NegativeInfinity;
+        Vector3[] dirs = { Vector3.forward, Vector3.back, Vector3.left, Vector3.right };
+
+        foreach (Vector3 dir in dirs)
+        {
+            bool blocked = Physics.CapsuleCast(
+                transform.position, transform.position + Vector3.up * 2f,
+                0.5f, dir, 1f, collisionLayerMask);
+            if (blocked) continue;
+
+            float score = Vector3.Dot(dir, toTarget);
+            if (score > bestScore) { bestScore = score; best = dir; }
+        }
+        return best; // hepsi bloksa zero (bir sonraki karede tekrar denenir)
     }
 
     // ── ETKİLEŞİM ─────────────────────────────────────────────────
@@ -235,12 +444,7 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
         if (interactCooldownTimer > 0f) return;
         if (activeTask == null || activeTask.targetCounter == null) return;
 
-        Vector3 agentXZ = new Vector3(transform.position.x, 0, transform.position.z);
-        Vector3 targetXZ = new Vector3(activeTask.targetCounter.transform.position.x, 0,
-                                       activeTask.targetCounter.transform.position.z);
-        float dist = Vector3.Distance(agentXZ, targetXZ);
-
-        if (dist > interactDistance) return;
+        if (DistanceToTargetXZ() > interactDistance) return;
 
         Debug.Log($"[Agent] Etkileşim: {activeTask.command}");
 
@@ -258,17 +462,15 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
 
     private void HandleFetch()
     {
+        Debug.Log($"[Fetch] Deneniyor. Eli boş mu: {!HasKitchenObject()}, Hedef: {activeTask?.targetCounter?.name}");
         if (!HasKitchenObject() && activeTask?.targetCounter != null)
         {
             activeTask.targetCounter.InteractFromAgent(this);
+            Debug.Log($"[Fetch] InteractFromAgent sonrası eli dolu mu: {HasKitchenObject()}");
             if (HasKitchenObject())
-            {
                 CompleteAgentTask();
-            }
             else
-            {
-                Debug.LogWarning("[Agent] Eşya alınamadı — Counter kodunu kontrol et.");
-            }
+                Debug.LogWarning("[Fetch] Eşya alınamadı!");
         }
     }
 
@@ -277,7 +479,10 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
         if (activeTask?.targetCounter is CuttingCounter cut && cut.HasKitchenObject())
         {
             cut.InteractAlternate(null);
-            if (cut.IsFullyCut()) CompleteAgentTask();
+            if (cut.IsFullyCut())
+                CompleteAgentTask();
+            else
+                AddReward(0.05f); // her geçerli kesme ilerlemesi — çok adımlı görevde ara sinyal
         }
     }
 
@@ -287,12 +492,21 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
 
         if (!stove.HasKitchenObject() && HasKitchenObject())
         {
+            if (!stove.CanFry(GetKitchenObject().GetKitchenObjectSO()))
+            {
+                Debug.LogError($"[Cook] '{stove.name}' ocağı '{GetKitchenObject().GetKitchenObjectSO().name}' " +
+                               "malzemesini pişiremiyor — ocağın FryingRecipeSOArray'ine bu malzemenin tarifi ekli mi?");
+                return;
+            }
             stove.InteractFromAgent(this);
+            // Malzeme ocağa kondu mu? (Tarif tutmadıysa elinde kalır)
+            if (!HasKitchenObject()) AddReward(0.2f);
             return;
         }
         if (stove.HasKitchenObject() && stove.IsIdle() && !HasKitchenObject())
         {
             stove.InteractAlternate(null);
+            AddReward(0.2f); // pişirme başlatıldı — ara sinyal
             return;
         }
         if (stove.HasKitchenObject() && stove.IsFried() && !HasKitchenObject())
@@ -301,6 +515,21 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
             stove.ResetStoveFromAgent();
             CompleteAgentTask();
         }
+    }
+
+    // Oyunda pişen yemeği yanmadan toplamak için otomatik tetikleme.
+    // Topladıysa true döner (o adımın geri kalanı atlanır).
+    private bool TryAutoCollectFried()
+    {
+        if (activeTask?.targetCounter is StoveCounter stove
+            && stove.HasKitchenObject() && stove.IsFried() && !HasKitchenObject())
+        {
+            stove.GetKitchenObject().SetKitchenObjectParent(this);
+            stove.ResetStoveFromAgent();
+            CompleteAgentTask();
+            return true;
+        }
+        return false;
     }
 
     // SousChefAgent.cs
@@ -320,20 +549,54 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
                           && !activeTask.targetCounter.HasKitchenObject();
 
         if (normalDrop || plateMerge)
+        {
             CompleteAgentTask();
-        else
-            Debug.LogWarning("[Deliver] Eşya bırakılamadı veya birleştirme başarısız.");
+            return;
+        }
+
+        // FAZLALIK MALZEME: ajan bir malzemeyi tabağa eklemeye çalıştı ama o malzeme
+        // tabakta ZATEN var (örn. oyuncu eklemiş). Birleştirme reddedildi, malzeme elde kaldı.
+        // Hedef (malzeme tabakta) zaten gerçekleşmiş → fazlalığı at, görevi tamamlanmış say.
+        // Zincir böylece sıradaki eksik malzemeye geçer.
+        if (HasKitchenObject() && GetKitchenObject() is not PlateKitchenObject
+            && activeTask.targetCounter.GetKitchenObject() is PlateKitchenObject targetPlate
+            && targetPlate.GetKitchenObjectSOList().Contains(GetKitchenObject().GetKitchenObjectSO()))
+        {
+            Debug.Log("[Deliver] Malzeme tabakta zaten var → fazlalık atılıyor, sıradaki malzemeye geçiliyor.");
+            GetKitchenObject().DestroySelf();
+            CompleteAgentTask();
+            return;
+        }
+
+        Debug.LogWarning("[Deliver] Eşya bırakılamadı veya birleştirme başarısız.");
     }
 
 
+    private void FailActiveTask()
+    {
+        // Görevler arası boşlukta (örn. sınır dışı) görev null olabilir
+        if (activeTask != null)
+            RecordTaskResult(activeTask.command, 0f);
+        activeTask = null;
+        taskManager.OnTaskFailed(); // TrainingManager yeni görev atar; episode orada kapanır
+    }
+
+    // TensorBoard'da görev tipi başına başarı oranı (Tasks/... grafikleri)
+    private void RecordTaskResult(SousChefCommand command, float success)
+    {
+        Academy.Instance.StatsRecorder.Add(
+            $"Tasks/{command}Success", success, StatAggregationMethod.Average);
+    }
+
     private void CompleteAgentTask()
     {
+        Debug.Log("[Agent] ✅ GÖREV TAMAMLANDI! +1 ödül");
+        RecordTaskResult(activeTask.command, 1f);
         AddReward(1f);
         activeTask = null;
         taskManager.OnTaskCompleted();
         interactCooldownTimer = 0f;
         hasEnteredInteractRange = false;
-        totalApproachReward = 0f;
         lastDistToTarget = float.MaxValue;
     }
 
@@ -358,11 +621,7 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
                 && dirToTarget != Vector3.zero)
                 transform.forward = dirToTarget.normalized;
 
-            Vector3 agentXZ = new Vector3(transform.position.x, 0, transform.position.z);
-            Vector3 targetXZ = new Vector3(activeTask.targetCounter.transform.position.x,
-                                           0,
-                                           activeTask.targetCounter.transform.position.z);
-            float distance = Vector3.Distance(agentXZ, targetXZ);
+            float distance = DistanceToTargetXZ();
 
             if (distance > interactDistance)
             {

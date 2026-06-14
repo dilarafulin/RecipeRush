@@ -195,6 +195,15 @@ public class CuttingCounter : BaseCounter, IHasProgress
         return null; // Hiçbir şarta uymuyorsa görev verme
     }
 
+    // Eğitim kurulumu: tahtaya sıfır ilerlemeyle malzeme koy
+    public void PlaceObjectForTraining(KitchenObjectSO so)
+    {
+        if (HasKitchenObject()) GetKitchenObject().DestroySelf();
+        cuttingProgress = 0;
+        KitchenObject.SpawnKitchenObject(so, this);
+        OnProgressChanged?.Invoke(this, new IHasProgress.OnProgressChangedEventArgs { progressNormalized = 0f });
+    }
+
     // Dışarıdaki scriptlerin (Agent'ın) malzemenin tamamen kesilip kesilmediğini öğrenmesi için
     public bool IsFullyCut()
     {

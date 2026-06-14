@@ -10,6 +10,11 @@ public class SousChefTrainingManager : MonoBehaviour
     [Header("Eğitim Ayarları")]
     [SerializeField] private bool trainingModeActive = false;
     [SerializeField] private float taskAssignDelay = 0.5f;
+    // Zincirler görevleri ardışık verir: ajan her görevde spawn'dan değil,
+    // önceki görevin bittiği yerden başlamayı da öğrenmeli (train/test dağılım uyumu)
+    [SerializeField] private int tasksPerEpisode = 4;
+
+    private int tasksThisEpisode = 0;
 
     [Header("Source Counter'lar ")]
     [SerializeField] private BaseCounter[] sourceCounters;
@@ -19,14 +24,52 @@ public class SousChefTrainingManager : MonoBehaviour
     [SerializeField] private BaseCounter stoveCounter;
     [SerializeField] private BaseCounter clearCounter;
     [SerializeField] private BaseCounter platesCounter;
+    // Zincirin kullandığı ama eğitimde hedef olmayan iki lokasyon — eklenmezse
+    // ajan bu konumlara gitmeyi öğrenemez (gözlemde hiç görmemiş olur)
+    [SerializeField] private BaseCounter deliveryCounter;
+    [SerializeField] private KitchenObjectSO plateKitchenObjectSO; // teslimat pratiği için tabak
+
+    [Header("Eğitim Malzemeleri")]
+    [SerializeField] private KitchenObjectSO[] choppableItemSOs; // kesme tarifi olanlar (örn: domates, soğan)
+    [SerializeField] private KitchenObjectSO fryableItemSO;   // pişirme tarifi olan (örn: çiğ köfte)
 
     private bool waitingForTask = false;
 
     private void Start()
     {
         if (!trainingModeActive) return;
+
+        // Ön kontrol: Cook müfredatı çalışabilir mi? Yanlış konfigürasyonla
+        // saatlerce eğitim yapmak yerine ilk karede bağır
+        if (fryableItemSO != null)
+        {
+            if (stoveCounter is StoveCounter stove)
+            {
+                if (!stove.CanFry(fryableItemSO))
+                    Debug.LogError($"[TrainingManager] HATA: '{stove.name}' ocağı '{fryableItemSO.name}' " +
+                                   "malzemesini pişiremiyor! FryingRecipeSOArray'de bu malzemenin tarifi yok. " +
+                                   "Cook görevleri asla tamamlanamayacak.");
+            }
+            else
+            {
+                Debug.LogError("[TrainingManager] HATA: stoveCounter alanı bir StoveCounter değil veya boş!");
+            }
+        }
+
         taskManager.OnTaskChanged += OnTaskChanged;
         StartCoroutine(AssignTaskAfterDelay());
+    }
+
+    private void Update()
+    {
+        if (!trainingModeActive) return;
+
+        // Aktif görev yoksa veya bitmişse VE şu an yeni görev beklenmiyorsa
+        SousChefTask current = taskManager.GetActiveTask();
+        if ((current == null || current.isCompleted) && !waitingForTask)
+        {
+            StartCoroutine(AssignTaskAfterDelay());
+        }
     }
 
     private void OnTaskChanged(object sender, System.EventArgs e)
@@ -49,42 +92,88 @@ public class SousChefTrainingManager : MonoBehaviour
 
     private void AssignRandomTask()
     {
-        // 5 görev tipi rastgele seçilir
-        int scenarioIndex = Random.Range(0, 5);
-
-        switch (scenarioIndex)
+        // Ajan eli doluysa temizle
+        if (agent.HasKitchenObject())
         {
-            case 0:
-                // 6 source counter arasından rastgele biri
-                if (sourceCounters.Length == 0) break;
-                BaseCounter randomSource = sourceCounters[Random.Range(0, sourceCounters.Length)];
-                Debug.Log($"[Training] FetchIngredient → {randomSource.name}");
-                taskManager.GiveCommand(SousChefCommand.FetchIngredient, randomSource);
-                break;
+            agent.GetKitchenObject().DestroySelf();
+            agent.ClearKitchenObject();
+        }
+        ClearTrainingCounters();
 
-            case 1:
-                if (cuttingCounter == null) break;
-                Debug.Log("[Training] ChopIngredient → CuttingCounter");
-                taskManager.GiveCommand(SousChefCommand.ChopIngredient, cuttingCounter);
-                break;
+        // Bölümü her görevde değil, birkaç görevde bir kapat — aradaki görevler
+        // ajanın o anki pozisyonundan başlar, tıpkı zincir çalıştırırken olduğu gibi
+        tasksThisEpisode++;
+        if (tasksThisEpisode >= tasksPerEpisode)
+        {
+            agent.EndEpisode();
+            tasksThisEpisode = 0;
+        }
 
-            case 2:
-                if (stoveCounter == null) break;
-                Debug.Log("[Training] CookIngredient → StoveCounter");
-                taskManager.GiveCommand(SousChefCommand.CookIngredient, stoveCounter);
-                break;
+        // Müfredat: %30 Fetch, %25 Chop, %25 Cook, %20 Deliver.
+        // Ön koşul referansları eksikse Fetch'e düşer — görev her zaman tamamlanabilir kalmalı
+        float r = Random.value;
 
-            case 3:
-                if (clearCounter == null) break;
-                Debug.Log("[Training] DeliverToCounter → ClearCounter");
+        if (r >= 0.3f && r < 0.55f
+            && cuttingCounter is CuttingCounter cut
+            && choppableItemSOs != null && choppableItemSOs.Length > 0)
+        {
+            KitchenObjectSO randomChoppable = choppableItemSOs[Random.Range(0, choppableItemSOs.Length)];
+            cut.PlaceObjectForTraining(randomChoppable);
+            taskManager.GiveCommand(SousChefCommand.ChopIngredient, cuttingCounter);
+            return;
+        }
+
+        if (r >= 0.55f && r < 0.8f && stoveCounter != null && fryableItemSO != null)
+        {
+            // Pişirilecek malzeme ajanın elinde başlar; ocağa taşıyıp pişirmesi gerekir
+            KitchenObject.SpawnKitchenObject(fryableItemSO, agent);
+            taskManager.GiveCommand(SousChefCommand.CookIngredient, stoveCounter);
+            return;
+        }
+
+        if (r >= 0.8f)
+        {
+            // Yarısı: tabakla teslimat tezgahına git ve teslim et (zincir finali)
+            if (deliveryCounter != null && plateKitchenObjectSO != null && Random.value < 0.5f)
+            {
+                KitchenObject.SpawnKitchenObject(plateKitchenObjectSO, agent);
+                taskManager.GiveCommand(SousChefCommand.DeliverToCounter, deliveryCounter);
+                return;
+            }
+            // Yarısı: elindeki malzemeyi boş tezgaha bırak
+            if (clearCounter != null && choppableItemSOs != null && choppableItemSOs.Length > 0)
+            {
+                KitchenObjectSO randomItem = choppableItemSOs[Random.Range(0, choppableItemSOs.Length)];
+                KitchenObject.SpawnKitchenObject(randomItem, agent);
                 taskManager.GiveCommand(SousChefCommand.DeliverToCounter, clearCounter);
-                break;
+                return;
+            }
+        }
 
-            case 4:
-                if (platesCounter == null) break;
-                Debug.Log("[Training] FetchIngredient → PlatesCounter");
-                taskManager.GiveCommand(SousChefCommand.FetchIngredient, platesCounter);
-                break;
+        // Fetch: bazen tabaklıktan al (zincir oradan tabak çeker), bazen kasadan
+        if (platesCounter != null && Random.value < 0.35f)
+        {
+            taskManager.GiveCommand(SousChefCommand.FetchIngredient, platesCounter);
+            return;
+        }
+        if (sourceCounters.Length == 0) return;
+        BaseCounter randomSource = sourceCounters[Random.Range(0, sourceCounters.Length)];
+        taskManager.GiveCommand(SousChefCommand.FetchIngredient, randomSource);
+    }
+
+    // Önceki görevden kalan malzemeler ortamı kirletmesin
+    private void ClearTrainingCounters()
+    {
+        if (cuttingCounter != null && cuttingCounter.HasKitchenObject())
+            cuttingCounter.GetKitchenObject().DestroySelf();
+
+        if (clearCounter != null && clearCounter.HasKitchenObject())
+            clearCounter.GetKitchenObject().DestroySelf();
+
+        if (stoveCounter != null && stoveCounter.HasKitchenObject())
+        {
+            stoveCounter.GetKitchenObject().DestroySelf();
+            if (stoveCounter is StoveCounter stove) stove.ResetStoveFromAgent();
         }
     }
 }

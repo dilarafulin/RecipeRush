@@ -45,8 +45,8 @@ GameObject:
   - component: {fileID: 7488120114233493522}
   - component: {fileID: 8827234014620263482}
   - component: {fileID: 2130435636683757224}
-  - component: {fileID: 3463133295378319888}
   - component: {fileID: 9141084854411935511}
+  - component: {fileID: 2272572226317997282}
   m_Layer: 0
   m_Name: SousChef
   m_TagString: Untagged
@@ -165,7 +165,7 @@ MonoBehaviour:
   TeamId: 0
   m_UseChildSensors: 1
   m_UseChildActuators: 1
-  m_DeterministicInference: 0
+  m_DeterministicInference: 1
   m_ObservableAttributeHandling: 0
 --- !u!114 &2130435636683757224
 MonoBehaviour:
@@ -182,7 +182,34 @@ MonoBehaviour:
   DecisionPeriod: 5
   DecisionStep: 0
   TakeActionsBetweenDecisions: 1
---- !u!114 &3463133295378319888
+--- !u!114 &9141084854411935511
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7313478203997278910}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b7241522065654419c10100fc37134f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SousChefAgent
+  agentParameters:
+    maxStep: 0
+  hasUpgradedFromAgentParameters: 1
+  MaxStep: 0
+  taskManager: {fileID: 0}
+  moveSpeed: 5
+  rotationSpeed: 20
+  interactDistance: 3
+  kitchenObjectHoldPoint: {fileID: 0}
+  collisionLayerMask:
+    serializedVersion: 2
+    m_Bits: 73
+  maxSceneDistance: 15
+  maxEpisodeTime: 30
+  trainingSpawnPoints: []
+--- !u!114 &2272572226317997282
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -210,30 +237,6 @@ MonoBehaviour:
   rayMissColor: {r: 1, g: 1, b: 1, a: 1}
   m_StartVerticalOffset: 0
   m_EndVerticalOffset: 0
---- !u!114 &9141084854411935511
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7313478203997278910}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0b7241522065654419c10100fc37134f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SousChefAgent
-  agentParameters:
-    maxStep: 0
-  hasUpgradedFromAgentParameters: 1
-  MaxStep: 0
-  taskManager: {fileID: 0}
-  moveSpeed: 5
-  rotationSpeed: 20
-  interactDistance: 3
-  kitchenObjectHoldPoint: {fileID: 0}
-  collisionLayerMask:
-    serializedVersion: 2
-    m_Bits: 73
 --- !u!1001 &6655744305399900764
 PrefabInstance:
   m_ObjectHideFlags: 0

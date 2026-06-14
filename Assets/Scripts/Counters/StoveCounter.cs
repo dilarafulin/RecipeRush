@@ -190,6 +190,9 @@ public class StoveCounter : BaseCounter, IHasProgress
     private bool HasFryingRecipeFor(KitchenObjectSO inputSO)
         => GetFryingRecipeFor(inputSO) != null;
 
+    // Dış kontrol: bu ocak verilen malzemeyi pişirebiliyor mu (eğitim doğrulaması için)
+    public bool CanFry(KitchenObjectSO inputSO) => HasFryingRecipeFor(inputSO);
+
     private FryingRecipeSO GetFryingRecipeFor(KitchenObjectSO inputSO)
     {
         foreach (FryingRecipeSO recipe in fryingRecipeSOArray)

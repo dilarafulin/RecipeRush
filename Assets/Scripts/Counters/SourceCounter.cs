@@ -4,19 +4,22 @@ public class SourceCounter : BaseCounter
 {
     [SerializeField] private KitchenObjectSO kitchenObjectSO; // hangi malzeme
 
+    // Zincir planlayÄ±cÄ±sÄ± doÄŸru kasayÄ± bulabilsin diye
+    public KitchenObjectSO GetKitchenObjectSO() => kitchenObjectSO;
+
     public override void Interact(Player player)
     {
         if (!player.HasKitchenObject())
         {
-            // Oyuncunun eli boþ — malzemeyi spawn et, direkt ele ver
+            // Oyuncunun eli boï¿½ ï¿½ malzemeyi spawn et, direkt ele ver
             KitchenObject.SpawnKitchenObject(kitchenObjectSO, player);
         }
-        // Oyuncunun elinde bir þey varsa hiçbir þey yapma
+        // Oyuncunun elinde bir ï¿½ey varsa hiï¿½bir ï¿½ey yapma
     }
 
     public override void InteractFromAgent(SousChefAgent agent)
     {
-        // Ajanýn eli boþsa, ona yeni bir malzeme (Örn: Domates) üret ve ver
+        // Ajanï¿½n eli boï¿½sa, ona yeni bir malzeme (ï¿½rn: Domates) ï¿½ret ve ver
         if (!agent.HasKitchenObject())
         {
             KitchenObject.SpawnKitchenObject(kitchenObjectSO, agent);
@@ -25,7 +28,7 @@ public class SourceCounter : BaseCounter
 
     public override SousChefTask GetTaskForAgent(SousChefAgent agent)
     {
-        // Ajanýn eli boþsa 
+        // Ajanï¿½n eli boï¿½sa 
         if (!agent.HasKitchenObject())
         {
             return new SousChefTask(SousChefCommand.FetchIngredient, this);

@@ -1,0 +1,65 @@
+{
+    "SousChefBehavior": {
+        "checkpoints": [
+            {
+                "steps": 76544,
+                "file_path": "results\\souschef_v26\\SousChefBehavior\\SousChefBehavior-76544.onnx",
+                "reward": 6.677365446835756,
+                "creation_time": 1781292279.2809277,
+                "auxillary_file_paths": [
+                    "results\\souschef_v26\\SousChefBehavior\\SousChefBehavior-76544.pt"
+                ]
+            },
+            {
+                "steps": 99977,
+                "file_path": "results\\souschef_v26\\SousChefBehavior\\SousChefBehavior-99977.onnx",
+                "reward": 7.25742444396019,
+                "creation_time": 1781292664.3719509,
+                "auxillary_file_paths": [
+                    "results\\souschef_v26\\SousChefBehavior\\SousChefBehavior-99977.pt"
+                ]
+            },
+            {
+                "steps": 149969,
+                "file_path": "results\\souschef_v26\\SousChefBehavior\\SousChefBehavior-149969.onnx",
+                "reward": 5.637880250811577,
+                "creation_time": 1781293184.589638,
+                "auxillary_file_paths": [
+                    "results\\souschef_v26\\SousChefBehavior\\SousChefBehavior-149969.pt"
+                ]
+            },
+            {
+                "steps": 199971,
+                "file_path": "results\\souschef_v26\\SousChefBehavior\\SousChefBehavior-199971.onnx",
+                "reward": 5.809137087315321,
+                "creation_time": 1781293659.598159,
+                "auxillary_file_paths": [
+                    "results\\souschef_v26\\SousChefBehavior\\SousChefBehavior-199971.pt"
+                ]
+            },
+            {
+                "steps": 200311,
+                "file_path": "results\\souschef_v26\\SousChefBehavior\\SousChefBehavior-200311.onnx",
+                "reward": 5.670422634482383,
+                "creation_time": 1781293663.226475,
+                "auxillary_file_paths": [
+                    "results\\souschef_v26\\SousChefBehavior\\SousChefBehavior-200311.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 200311,
+            "file_path": "results\\souschef_v26\\SousChefBehavior.onnx",
+            "reward": 5.670422634482383,
+            "creation_time": 1781293663.226475,
+            "auxillary_file_paths": [
+                "results\\souschef_v26\\SousChefBehavior\\SousChefBehavior-200311.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.2.1+cpu"
+    }
+}

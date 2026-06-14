@@ -4,18 +4,18 @@ using UnityEngine;
 
 public class DeliveryManager : MonoBehaviour
 {
-    // Singleton (Oyunun her yerinden kolayca eriþebilmek için)
+    // Singleton (Oyunun her yerinden kolayca eriï¿½ebilmek iï¿½in)
     public static DeliveryManager Instance { get; private set; }
 
     [Header("Veri Havuzu")]
-    [SerializeField] private RecipeListSO recipeListSO; // Oluþturduðun "AllRecipes" dosyasýný buraya sürükle
+    [SerializeField] private RecipeListSO recipeListSO; // Oluï¿½turduï¿½un "AllRecipes" dosyasï¿½nï¿½ buraya sï¿½rï¿½kle
 
-    private List<RecipeSO> waitingRecipeSOList; // Ekranda bekleyen aktif sipariþler
+    private List<RecipeSO> waitingRecipeSOList; // Ekranda bekleyen aktif sipariï¿½ler
     private float spawnRecipeTimer;
-    private float spawnRecipeTimerMax = 4f; // Her 4 saniyede bir sipariþ gelsin
-    private int waitingRecipesMax = 4; // Ekranda maksimum 4 sipariþ birikebilsin
+    private float spawnRecipeTimerMax = 4f; // Her 4 saniyede bir sipariï¿½ gelsin
+    private int waitingRecipesMax = 4; // Ekranda maksimum 4 sipariï¿½ birikebilsin
 
-    // UI'ýn haberdar olmasý için Event'ler
+    // UI'ï¿½n haberdar olmasï¿½ iï¿½in Event'ler
     public event EventHandler OnRecipeSpawned;
     public event EventHandler OnRecipeCompleted;
 
@@ -27,40 +27,44 @@ public class DeliveryManager : MonoBehaviour
 
     private void Update()
     {
+        // Sipariï¿½ler sadece bir bï¿½lï¿½m aktif oynanï¿½rken gelsin (geri sayï¿½m / bï¿½lï¿½m
+        // sonu / oyun bitti ekranlarï¿½nda yeni sipariï¿½ spawn olmamalï¿½)
+        if (GameManager.Instance != null && !GameManager.Instance.IsGamePlaying()) return;
+
         spawnRecipeTimer -= Time.deltaTime;
         if (spawnRecipeTimer <= 0f)
         {
             spawnRecipeTimer = spawnRecipeTimerMax;
 
-            // Eðer ekrandaki sipariþ sayýsý sýnýrý aþmadýysa yeni sipariþ ver
+            // Eï¿½er ekrandaki sipariï¿½ sayï¿½sï¿½ sï¿½nï¿½rï¿½ aï¿½madï¿½ysa yeni sipariï¿½ ver
             if (waitingRecipeSOList.Count < waitingRecipesMax)
             {
-                // Havuzdan rastgele bir tarif seç
+                // Havuzdan rastgele bir tarif seï¿½
                 RecipeSO waitingRecipeSO = recipeListSO.recipeSOList[UnityEngine.Random.Range(0, recipeListSO.recipeSOList.Count)];
 
                // Debug.Log(waitingRecipeSO.recipeName);
                 // Bekleyenler listesine ekle
                 waitingRecipeSOList.Add(waitingRecipeSO);
 
-                // Arayüze (UI) haber ver: "Yeni sipariþ geldi, ekrana çiz!"
+                // Arayï¿½ze (UI) haber ver: "Yeni sipariï¿½ geldi, ekrana ï¿½iz!"
                 OnRecipeSpawned?.Invoke(this, EventArgs.Empty);
             }
         }
     }
 
-    // Oyuncu elinde bir tabakla teslimat tezgahýna geldiðinde bu fonksiyon çalýþacak
+    // Oyuncu elinde bir tabakla teslimat tezgahï¿½na geldiï¿½inde bu fonksiyon ï¿½alï¿½ï¿½acak
     public void DeliverRecipe(List<KitchenObjectSO> plateKitchenObjectSOList)
     {
         for (int i = 0; i < waitingRecipeSOList.Count; i++)
         {
             RecipeSO waitingRecipeSO = waitingRecipeSOList[i];
 
-            // 1. Kural: Tabaktaki malzeme sayýsý ile tarifteki malzeme sayýsý eþit mi?
+            // 1. Kural: Tabaktaki malzeme sayï¿½sï¿½ ile tarifteki malzeme sayï¿½sï¿½ eï¿½it mi?
             if (waitingRecipeSO.kitchenObjectSOList.Count == plateKitchenObjectSOList.Count)
             {
                 bool plateContentsMatchesRecipe = true;
 
-                // 2. Kural: Tarifteki her bir malzeme, tabakta var mý?
+                // 2. Kural: Tarifteki her bir malzeme, tabakta var mï¿½?
                 foreach (KitchenObjectSO recipeKitchenObjectSO in waitingRecipeSO.kitchenObjectSOList)
                 {
                     bool ingredientFound = false;
@@ -75,7 +79,7 @@ public class DeliveryManager : MonoBehaviour
 
                     if (!ingredientFound)
                     {
-                        // Bu malzeme tabakta yok! Demek ki bu tarif deðil.
+                        // Bu malzeme tabakta yok! Demek ki bu tarif deï¿½il.
                         plateContentsMatchesRecipe = false;
                         break;
                     }
@@ -83,25 +87,34 @@ public class DeliveryManager : MonoBehaviour
 
                 if (plateContentsMatchesRecipe)
                 {
-                    // BAÞARILI TESLÝMAT!
-                    Debug.Log("Sipariþ Baþarýyla Teslim Edildi: " + waitingRecipeSO.recipeName);
+                    // BAï¿½ARILI TESLï¿½MAT!
+                    Debug.Log("Sipariï¿½ Baï¿½arï¿½yla Teslim Edildi: " + waitingRecipeSO.recipeName);
 
                     waitingRecipeSOList.RemoveAt(i);
 
-                    // UI'a haber ver: "Bu sipariþ bitti, ekrandan sil!"
+                    // UI'a haber ver: "Bu sipariï¿½ bitti, ekrandan sil!"
                     OnRecipeCompleted?.Invoke(this, EventArgs.Empty);
                     return;
                 }
             }
         }
 
-        // Eðer döngü bittiyse ve return olmadýysa, oyuncu yanlýþ yemek getirmiþtir.
-        Debug.Log("Hata: Oyuncu yanlýþ bir yemek getirdi veya böyle bir sipariþ yok!");
+        // Eï¿½er dï¿½ngï¿½ bittiyse ve return olmadï¿½ysa, oyuncu yanlï¿½ï¿½ yemek getirmiï¿½tir.
+        Debug.Log("Hata: Oyuncu yanlï¿½ï¿½ bir yemek getirdi veya bï¿½yle bir sipariï¿½ yok!");
     }
 
-    // UI'ýn bekleyen listeyi okuyabilmesi için
+    // UI'ï¿½n bekleyen listeyi okuyabilmesi iï¿½in
     public List<RecipeSO> GetWaitingRecipeSOList()
     {
         return waitingRecipeSOList;
+    }
+
+    // Yeni bï¿½lï¿½m baï¿½larken bekleyen sipariï¿½leri temizle (sayaca dokunmaz; teslim
+    // sayï¿½mï¿½ GameManager tarafï¿½nda OnRecipeCompleted ile tutulur)
+    public void ResetOrders()
+    {
+        waitingRecipeSOList.Clear();
+        spawnRecipeTimer = spawnRecipeTimerMax;
+        OnRecipeSpawned?.Invoke(this, EventArgs.Empty); // UI'ï¿½ boï¿½ listeyle yenile
     }
 }

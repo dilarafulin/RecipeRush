@@ -1,0 +1,29 @@
+{
+    "SousChefBehavior": {
+        "checkpoints": [
+            {
+                "steps": 2063,
+                "file_path": "results\\souschef_v7\\SousChefBehavior\\SousChefBehavior-2063.onnx",
+                "reward": -4.274999871850014,
+                "creation_time": 1781031948.4371147,
+                "auxillary_file_paths": [
+                    "results\\souschef_v7\\SousChefBehavior\\SousChefBehavior-2063.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 2063,
+            "file_path": "results\\souschef_v7\\SousChefBehavior.onnx",
+            "reward": -4.274999871850014,
+            "creation_time": 1781031948.4371147,
+            "auxillary_file_paths": [
+                "results\\souschef_v7\\SousChefBehavior\\SousChefBehavior-2063.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.12.0+cpu"
+    }
+}

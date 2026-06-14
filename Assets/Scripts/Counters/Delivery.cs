@@ -4,24 +4,41 @@ public class DeliveryCounter : BaseCounter
 {
     public override void Interact(Player player)
     {
-        // 1. Oyuncunun elinde bir þey var mý?
+        // 1. Oyuncunun elinde bir ï¿½ey var mï¿½?
         if (player.HasKitchenObject())
         {
-            // 2. MODERN C#: Pattern Matching (Desen Eþleþtirme)
-            // Eðer elindeki obje bir 'PlateKitchenObject' ise, onu anýnda 'plateKitchenObject' deðiþkenine dönüþtür ve içeri gir!
+            // 2. MODERN C#: Pattern Matching (Desen Eï¿½leï¿½tirme)
+            // Eï¿½er elindeki obje bir 'PlateKitchenObject' ise, onu anï¿½nda 'plateKitchenObject' deï¿½iï¿½kenine dï¿½nï¿½ï¿½tï¿½r ve iï¿½eri gir!
             if (player.GetKitchenObject() is PlateKitchenObject plateKitchenObject)
             {
-                // 3. Tabaðýn içindeki malzemelerin listesini al ve Hakem'e (Manager) gönder!
+                // 3. Tabaï¿½ï¿½n iï¿½indeki malzemelerin listesini al ve Hakem'e (Manager) gï¿½nder!
                 DeliveryManager.Instance.DeliverRecipe(plateKitchenObject.GetKitchenObjectSOList());
 
-                // 4. Teslimat yapýldýktan sonra tabaðý yok et
+                // 4. Teslimat yapï¿½ldï¿½ktan sonra tabaï¿½ï¿½ yok et
                 player.GetKitchenObject().DestroySelf();
             }
             else
             {
-                // Oyuncu elinde tabak olmayan bir þeyle (örn: Domates) geldi. Hiçbir þey yapma.
+                // Oyuncu elinde tabak olmayan bir ï¿½eyle (ï¿½rn: Domates) geldi. Hiï¿½bir ï¿½ey yapma.
                 Debug.Log("Sadece tabakla teslimat yapabilirsin!");
             }
         }
+    }
+
+    public override void InteractFromAgent(SousChefAgent agent)
+    {
+        if (agent.HasKitchenObject() && agent.GetKitchenObject() is PlateKitchenObject plateKitchenObject)
+        {
+            DeliveryManager.Instance.DeliverRecipe(plateKitchenObject.GetKitchenObjectSOList());
+            // Tabak yok edilince ajanÄ±n eli boÅŸalÄ±r â†’ HandleDeliver gÃ¶revi tamamlanmÄ±ÅŸ sayar
+            agent.GetKitchenObject().DestroySelf();
+        }
+    }
+
+    public override SousChefTask GetTaskForAgent(SousChefAgent agent)
+    {
+        if (agent.HasKitchenObject() && agent.GetKitchenObject() is PlateKitchenObject)
+            return new SousChefTask(SousChefCommand.DeliverToCounter, this);
+        return null;
     }
 }

@@ -1,0 +1,42 @@
+{
+    "name": "root",
+    "metadata": {
+        "timer_format_version": "0.1.0",
+        "start_time_seconds": "1781094514",
+        "python_version": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+        "command_line_arguments": "D:\\UnityGames\\MLAgents\\mlagents_env\\Scripts\\mlagents-learn config\\souschef.yaml --run-id=souschef_v12",
+        "mlagents_version": "1.1.0",
+        "mlagents_envs_version": "1.1.0",
+        "communication_protocol_version": "1.5.0",
+        "pytorch_version": "2.12.0+cpu",
+        "numpy_version": "1.23.5",
+        "end_time_seconds": "1781094600"
+    },
+    "total": 85.50163420000013,
+    "count": 1,
+    "self": 0.09501060000002326,
+    "children": {
+        "run_training.setup": {
+            "total": 0.1496497000000545,
+            "count": 1,
+            "self": 0.1496497000000545
+        },
+        "TrainerController.start_learning": {
+            "total": 85.25697390000005,
+            "count": 1,
+            "self": 0.003112500000042928,
+            "children": {
+                "TrainerController._reset_env": {
+                    "total": 85.25106310000001,
+                    "count": 1,
+                    "self": 85.25106310000001
+                },
+                "TrainerController._save_models": {
+                    "total": 0.0027982999999949243,
+                    "count": 1,
+                    "self": 0.0027982999999949243
+                }
+            }
+        }
+    }
+}

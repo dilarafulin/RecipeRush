@@ -8,14 +8,14 @@ public class SousChefCommandUI : MonoBehaviour
 {
     [Header("Referanslar")]
     [SerializeField] private SousChefTaskManager taskManager;
-    [SerializeField] private SousChefAgent agent; // YENÝ: Tezgaha "Ajanýn durumu ne?" diye sorabilmek için
+    [SerializeField] private SousChefAgent agent; // YENï¿½: Tezgaha "Ajanï¿½n durumu ne?" diye sorabilmek iï¿½in
     [SerializeField] private LayerMask countersLayerMask;
 
     [SerializeField] private ChopAndPlateChain ChopChain;
     [SerializeField] private CookAndPlateChain CookChain;
 
 
-    [Header("UI Elemanlarý")]
+    [Header("UI Elemanlarï¿½")]
     [SerializeField] private GameObject menuPanel;
     [SerializeField] private Transform buttonParent;
     [SerializeField] private Button buttonPrefab;
@@ -43,50 +43,40 @@ public class SousChefCommandUI : MonoBehaviour
         {
             BaseCounter counter = hit.collider.GetComponent<BaseCounter>();
 
+            // MenÃ¼yÃ¼ HER ZAMAN aÃ§ â€” ajan elinde bir ÅŸey tutarken/meÅŸgulken de komut
+            // verilebilmeli. Komutun uygulanabilirliÄŸini AssignTaskBasedOnContext karar verir
+            // (boÅŸsa hemen, elinde bir ÅŸey varsa mevcut iÅŸini bitirince sÄ±raya alÄ±r).
             if (counter != null)
-            {
-                // ARTIK HARDCODE DEÐÝL: Tezgaha akýllý görevi soruyoruz!
-                SousChefTask smartTask = counter.GetTaskForAgent(agent);
-
-                // Eðer tezgah mantýklý bir görev döndürdüyse menüyü aç
-                if (smartTask != null)
-                {
-                    OpenMenu(counter,smartTask);
-                }
-                else
-                {
-                    Debug.Log("Bu durumda yapýlabilecek bir iþlem yok.");
-                    // Ýsteðe baðlý: Ekranda küçük bir kýrmýzý uyarý çýkartabilirsin
-                }
-            }
+                OpenMenu(counter);
         }
     }
 
-    private void OpenMenu(BaseCounter clickedCounter, SousChefTask task)
+    private void OpenMenu(BaseCounter clickedCounter)
     {
-        // 1. Önceki açýlýþtan kalan eski butonlarý temizle 
+        // 1. ï¿½nceki aï¿½ï¿½lï¿½ï¿½tan kalan eski butonlarï¿½ temizle
         foreach (Transform child in buttonParent)
             Destroy(child.gameObject);
 
-        // 2. ATOMÝK BUTON: Eðer ajan için anlýk bir görev (Örn: Fetch) varsa oluþtur
-        if (task != null)
+        // 2. ATOMÄ°K BUTON: her zaman gÃ¶ster. AssignTaskBasedOnContext deferral'Ä± yÃ¶netir:
+        //    ajan boÅŸsa komutu hemen verir, elinde bir ÅŸey varsa mevcut iÅŸini bitirip
+        //    SONRA bu komutu yapar, ardÄ±ndan zincirine kaldÄ±ÄŸÄ± yerden devam eder.
         {
             Button btnAtomik = Instantiate(buttonPrefab, buttonParent);
-            btnAtomik.GetComponentInChildren<TextMeshProUGUI>().text = GetLabelForCommand(task.command);
+            btnAtomik.GetComponentInChildren<TextMeshProUGUI>().text = GetLabelForCounter(clickedCounter);
             btnAtomik.onClick.AddListener(() =>
             {
-                taskManager.GiveCommand(task.command, task.targetCounter, task.targetItemSO);
+                taskManager.AssignTaskBasedOnContext(clickedCounter);
                 CloseMenu();
             });
         }
 
-        // 3. MAKRO BUTON: Eðer týklanan tezgah malzeme üreten bir Kasaysa, "Otomasyon" butonunu ekle
+        // 3. MAKRO BUTON: Eï¿½er tï¿½klanan tezgah malzeme ï¿½reten bir Kasaysa, "Otomasyon" butonunu ekle
         if (clickedCounter is SourceCounter sourceCounter)
         {
-            // BUTON 1: OTONOM DOÐRAMA
+            // BUTON 1: OTONOM DOï¿½RAMA
             Button btnChop = Instantiate(buttonPrefab, buttonParent);
-            btnChop.GetComponentInChildren<TextMeshProUGUI>().text = "Otonom Doðrama";
-            btnChop.GetComponent<Image>().color = new Color(1f, 0.8f, 0.2f); // Sarý
+            btnChop.GetComponentInChildren<TextMeshProUGUI>().text = "Otonom Doï¿½rama";
+            btnChop.GetComponent<Image>().color = new Color(1f, 0.8f, 0.2f); // Sarï¿½
             btnChop.onClick.AddListener(() =>
             {
                 if (ChopChain != null)
@@ -97,10 +87,10 @@ public class SousChefCommandUI : MonoBehaviour
                 CloseMenu();
             });
 
-            // BUTON 2: OTONOM PÝÞÝRME
+            // BUTON 2: OTONOM Pï¿½ï¿½ï¿½RME
             Button btnCook = Instantiate(buttonPrefab, buttonParent);
-            btnCook.GetComponentInChildren<TextMeshProUGUI>().text = "Otonom Piþirme";
-            btnCook.GetComponent<Image>().color = new Color(1f, 0.4f, 0.2f); // Turuncu (Farklý renk)
+            btnCook.GetComponentInChildren<TextMeshProUGUI>().text = "Otonom Piï¿½irme";
+            btnCook.GetComponent<Image>().color = new Color(1f, 0.4f, 0.2f); // Turuncu (Farklï¿½ renk)
             btnCook.onClick.AddListener(() =>
             {
                 if (CookChain != null)
@@ -112,22 +102,25 @@ public class SousChefCommandUI : MonoBehaviour
             });
         }
 
-        // 4. Menüyü mouse'un olduðu koordinata taþý ve görünür yap 
+        // 4. Menï¿½yï¿½ mouse'un olduï¿½u koordinata taï¿½ï¿½ ve gï¿½rï¿½nï¿½r yap 
         menuPanel.transform.position = Mouse.current.position.ReadValue();
         menuPanel.SetActive(true);
         menuOpen = true;
     }
 
-    // YENÝ: Ajanýn komutunu oyuncunun okuyabileceði güzel bir metne çevirir
-    private string GetLabelForCommand(SousChefCommand cmd)
+    // Tezgah tipine gÃ¶re buton etiketi (gerÃ§ek komut, Ã§alÄ±ÅŸma anÄ±nda
+    // AssignTaskBasedOnContext â†’ GetTaskForAgent ile Ã§Ã¶zÃ¼lÃ¼r; bu sadece ipucu)
+    private string GetLabelForCounter(BaseCounter counter)
     {
-        switch (cmd)
+        switch (counter)
         {
-            case SousChefCommand.FetchIngredient: return "Malzemeyi Al";
-            case SousChefCommand.ChopIngredient: return "Malzemeyi Kes";
-            case SousChefCommand.CookIngredient: return "Malzemeyi Piþir";
-            case SousChefCommand.DeliverToCounter: return "Buraya Býrak";
-            default: return "Ýþlem Yap";
+            case SourceCounter _: return "Malzemeyi Al";
+            case PlatesCounter _: return "Tabak Al";
+            case CuttingCounter _: return "Kesme TahtasÄ±";
+            case StoveCounter _: return "Ocak";
+            case DeliveryCounter _: return "Teslim Et";
+            case ClearCounter _: return "Tezgaha BÄ±rak / Al";
+            default: return "Komut Ver";
         }
     }
 
