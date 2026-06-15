@@ -1,57 +1,44 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
+// Tek bir bölümü yönetir (hangisi olduğu LevelSelection.CurrentLevelIndex'ten gelir).
+// Kazanma/kaybetme/sonraki bölüm geçişleri GameScene'i yeniden yükleyerek yapılır,
+// böylece ajan, tezgahlar, siparişler her bölümde temiz başlar.
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    // Mevcut UI'ların dinlediği olaylar (korunuyor)
     public event EventHandler OnStateChanged;
     public event EventHandler OnGamePaused;
     public event EventHandler OnGameUnpaused;
-
-    // Seviye sistemi olayları
-    public event EventHandler OnLevelStarted;   // yeni bölüm başladı
-    public event EventHandler OnLevelCompleted;  // bölüm hedefi tutturuldu (son bölüm değilse)
-    public event EventHandler OnGameWon;         // tüm bölümler tamamlandı
-    public event EventHandler OnGameLost;        // süre doldu, hedefe ulaşılamadı
-
-    [Serializable]
-    public class LevelConfig
-    {
-        public float durationSeconds = 180f; // bölüm süresi
-        public int targetOrders = 5;         // tamamlanması gereken sipariş sayısı
-    }
-
-    [Header("Bölümler (sırayla)")]
-    [SerializeField] private List<LevelConfig> levels = new List<LevelConfig>();
-    [SerializeField] private float levelCompletePauseSeconds = 3f; // "Bölüm tamamlandı" gösterim süresi
+    public event EventHandler OnLevelWon;
+    public event EventHandler OnLevelLost;
 
     [Header("Referanslar")]
+    [SerializeField] private LevelListSO levelList; // tüm bölüm tanımları (asset)
     [SerializeField] private PlayerInput playerInput;
 
-    private enum State
-    {
-        CountdownToStart, // her bölüm öncesi 3-2-1
-        GamePlaying,
-        LevelComplete,    // bölüm tamamlandı, sıradakine geçiş bekleniyor
-        GameWon,          // tüm bölümler bitti
-        GameOver,         // kaybedildi (süre doldu)
-    }
+    private enum State { CountdownToStart, GamePlaying, LevelWon, LevelLost }
 
     private State state;
     private float countdownToStartTimer = 3f;
     private float gamePlayingTimer;
-    private float levelCompleteTimer;
     private bool IsGamePaused = false;
-
-    private int currentLevelIndex = 0;
     private int deliveredThisLevel = 0;
+
+    private LevelConfig Level
+    {
+        get
+        {
+            int i = Mathf.Clamp(LevelSelection.CurrentLevelIndex, 0, levelList.levels.Count - 1);
+            return levelList.levels[i];
+        }
+    }
 
     private void Awake()
     {
         Instance = this;
+        Time.timeScale = 1f; // önceki bölümden kalma 0 olabilir
         state = State.CountdownToStart;
         countdownToStartTimer = 3f;
     }
@@ -65,23 +52,27 @@ public class GameManager : MonoBehaviour
 
         if (DeliveryManager.Instance != null)
             DeliveryManager.Instance.OnRecipeCompleted += DeliveryManager_OnRecipeCompleted;
-        else
-            Debug.LogError("GameManager: DeliveryManager bulunamadı!");
 
-        if (levels.Count == 0)
-            Debug.LogError("GameManager: Hiç bölüm tanımlanmamış! Inspector'dan Levels listesini doldur.");
+        if (levelList == null || levelList.levels.Count == 0)
+            Debug.LogError("GameManager: LevelListSO atanmamış veya boş!");
+
+        gamePlayingTimer = Level.durationSeconds;
     }
 
     private void GameInput_OnPauseAction(object sender, EventArgs e) => TogglePauseGame();
 
-    // Bir sipariş başarıyla teslim edildi (oyuncu ya da ajan — fark etmez)
     private void DeliveryManager_OnRecipeCompleted(object sender, EventArgs e)
     {
         if (state != State.GamePlaying) return;
 
         deliveredThisLevel++;
-        if (deliveredThisLevel >= CurrentLevel().targetOrders)
-            CompleteLevel();
+        if (deliveredThisLevel >= Level.targetOrders)
+        {
+            state = State.LevelWon;
+            Time.timeScale = 0f; // sahne donsun, sonuç paneli gösterilsin
+            OnLevelWon?.Invoke(this, EventArgs.Empty);
+            OnStateChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private void Update()
@@ -91,112 +82,79 @@ public class GameManager : MonoBehaviour
             case State.CountdownToStart:
                 countdownToStartTimer -= Time.deltaTime;
                 if (countdownToStartTimer < 0f)
-                    StartLevel();
+                {
+                    deliveredThisLevel = 0;
+                    gamePlayingTimer = Level.durationSeconds;
+                    state = State.GamePlaying;
+                    OnStateChanged?.Invoke(this, EventArgs.Empty);
+                }
                 break;
 
             case State.GamePlaying:
                 gamePlayingTimer -= Time.deltaTime;
                 if (gamePlayingTimer < 0f)
                 {
-                    // Süre doldu ve hedefe ulaşılamadı → kaybettin
-                    state = State.GameOver;
-                    OnGameLost?.Invoke(this, EventArgs.Empty);
+                    // Süre doldu, hedefe ulaşılamadı → kaybettin
+                    state = State.LevelLost;
+                    Time.timeScale = 0f;
+                    OnLevelLost?.Invoke(this, EventArgs.Empty);
                     OnStateChanged?.Invoke(this, EventArgs.Empty);
                 }
                 break;
-
-            case State.LevelComplete:
-                levelCompleteTimer -= Time.deltaTime;
-                if (levelCompleteTimer < 0f)
-                {
-                    // Sıradaki bölüme geç (geri sayımla)
-                    currentLevelIndex++;
-                    countdownToStartTimer = 3f;
-                    state = State.CountdownToStart;
-                    OnStateChanged?.Invoke(this, EventArgs.Empty);
-                }
-                break;
-
-            case State.GameWon:
-            case State.GameOver:
-                break;
         }
     }
 
-    private LevelConfig CurrentLevel()
-        => levels[Mathf.Clamp(currentLevelIndex, 0, Mathf.Max(0, levels.Count - 1))];
+    public bool HasNextLevel() => LevelSelection.CurrentLevelIndex < levelList.levels.Count - 1;
 
-    private void StartLevel()
+    // Sonraki bölüme geç → GameScene yeniden yüklenir (her şey sıfırlanır).
+    // Sonraki yoksa ana menüye döner.
+    public void GoToNextLevel()
     {
-        deliveredThisLevel = 0;
-        gamePlayingTimer = CurrentLevel().durationSeconds;
-
-        if (DeliveryManager.Instance != null)
-            DeliveryManager.Instance.ResetOrders(); // bölüm temiz başlasın
-
-        state = State.GamePlaying;
-        OnLevelStarted?.Invoke(this, EventArgs.Empty);
-        OnStateChanged?.Invoke(this, EventArgs.Empty);
+        Time.timeScale = 1f;
+        if (!HasNextLevel())
+        {
+            Loader.Load(Loader.Scene.MainMenuScene);
+            return;
+        }
+        LevelSelection.CurrentLevelIndex++;
+        Loader.Load(Loader.Scene.GameScene);
     }
 
-    private void CompleteLevel()
-    {
-        if (currentLevelIndex >= levels.Count - 1)
-        {
-            // Son bölüm de tamamlandı → oyunu bitirdin
-            state = State.GameWon;
-            OnGameWon?.Invoke(this, EventArgs.Empty);
-            OnStateChanged?.Invoke(this, EventArgs.Empty);
-        }
-        else
-        {
-            // Bölüm tamamlandı → kısa bir gösterim, sonra sıradaki bölüm
-            state = State.LevelComplete;
-            levelCompleteTimer = levelCompletePauseSeconds;
-            OnLevelCompleted?.Invoke(this, EventArgs.Empty);
-            OnStateChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    // Kaybedince mevcut bölümü baştan dene (GameOver ekranındaki "Tekrar Dene" butonu çağırır)
     public void RetryLevel()
     {
-        countdownToStartTimer = 3f;
-        state = State.CountdownToStart;
-        OnStateChanged?.Invoke(this, EventArgs.Empty);
+        Time.timeScale = 1f;
+        Loader.Load(Loader.Scene.GameScene); // aynı bölümü baştan
     }
 
-    // Oyunu en baştan başlat (örn. kazandıktan sonra "Yeniden Oyna")
-    public void RestartGame()
+    public void GoToMainMenu()
     {
-        currentLevelIndex = 0;
-        countdownToStartTimer = 3f;
-        state = State.CountdownToStart;
-        OnStateChanged?.Invoke(this, EventArgs.Empty);
+        Time.timeScale = 1f;
+        Loader.Load(Loader.Scene.MainMenuScene);
     }
 
-    // ── Durum sorguları (UI için) ──
+    // ── Durum sorguları (UI) ──
     public bool IsGamePlaying() => state == State.GamePlaying;
     public bool IsCountdownToStartActive() => state == State.CountdownToStart;
-    public bool IsLevelComplete() => state == State.LevelComplete;
-    public bool IsGameWon() => state == State.GameWon;
-    public bool IsGameOver() => state == State.GameOver;
+    public bool IsLevelWon() => state == State.LevelWon;
+    public bool IsLevelLost() => state == State.LevelLost;
     public float GetCountdownToStartTimer() => countdownToStartTimer;
 
-    // Seviye bilgisi (HUD için)
-    public int GetLevelNumber() => currentLevelIndex + 1;       // 1 tabanlı
-    public int GetTotalLevels() => levels.Count;
+    public int GetLevelNumber() => LevelSelection.CurrentLevelIndex + 1;
+    public int GetTotalLevels() => levelList != null ? levelList.levels.Count : 0;
     public int GetDeliveredThisLevel() => deliveredThisLevel;
-    public int GetTargetOrders() => CurrentLevel().targetOrders;
+    public int GetTargetOrders() => Level.targetOrders;
     public float GetTimeRemaining() => Mathf.Max(0f, gamePlayingTimer);
     public float GetGamePlayingTimerNormalized()
     {
-        float max = CurrentLevel().durationSeconds;
+        float max = Level.durationSeconds;
         return max > 0f ? 1f - (gamePlayingTimer / max) : 0f;
     }
 
     public void TogglePauseGame()
     {
+        // Sadece oyun oynanırken duraklatma anlamlı (kazandın/kaybettin ekranını dondurma)
+        if (state != State.GamePlaying && !IsGamePaused) return;
+
         IsGamePaused = !IsGamePaused;
         if (IsGamePaused)
         {
