@@ -42,6 +42,7 @@ GameObject:
   - component: {fileID: 5015346568192741480}
   - component: {fileID: 3529959141107927270}
   - component: {fileID: 7517165293964281310}
+  - component: {fileID: 4795405655323260253}
   m_Layer: 3
   m_Name: Player
   m_TagString: Untagged
@@ -106,6 +107,20 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.0082817, y: 2.1905632, z: 1}
   m_Center: {x: 0.027873993, y: 1.0792575, z: 0}
+--- !u!114 &4795405655323260253
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8514913252701088098}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ef7774d2cad053648b9f8e200421107e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FootstepSounds
+  footstepInterval: 0.3
+  volume: 1
 --- !u!1001 &138743250201393845
 PrefabInstance:
   m_ObjectHideFlags: 0

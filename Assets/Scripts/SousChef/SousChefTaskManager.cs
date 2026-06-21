@@ -35,6 +35,37 @@ public class SousChefTaskManager : MonoBehaviour
         Instance = this;
     }
 
+    private void Start()
+    {
+        // DeliveryManager'daki teslimat event'ini dinlemeye başla
+        if (DeliveryManager.Instance != null)
+        {
+            DeliveryManager.Instance.OnRecipeCompleted += DeliveryManager_OnRecipeCompleted;
+        }
+    }
+    private void OnDestroy()
+    {
+        // Obje yok olduğunda veya sahne değiştiğinde dinlemeyi bırak
+        if (DeliveryManager.Instance != null)
+        {
+            DeliveryManager.Instance.OnRecipeCompleted -= DeliveryManager_OnRecipeCompleted;
+        }
+    }
+
+    private void DeliveryManager_OnRecipeCompleted(object sender, EventArgs e)
+    {
+        // Eğer ajan aktif olarak bir görevdeyse ve oyuncu bir siparişi teslim ettiyse:
+        if (agent != null && activeTask != null)
+        {
+            Debug.Log("[TaskManager] Oyuncu bir siparişi teslim etti. Ajanın görevi iptal ediliyor...");
+
+            // 2. adımda ajana eklediğimiz iptal metodunu çağırıyoruz.
+            // Bu metod ajanın elindekini yok edecek ve ardından FailActiveTask() çağırarak
+            // süreci tekrar TaskManager'ın OnTaskFailed() metoduna yönlendirecek.
+            // Böylece activeChain de temizlenmiş olacak.
+            agent.ForceCancelTask();
+        }
+    }
     //polimorfizm
     public void AssignTaskBasedOnContext(BaseCounter clickedCounter)
     {

@@ -4,7 +4,6 @@ using UnityEngine;
 
 public class DeliveryManager : MonoBehaviour
 {
-    // Singleton (Oyunun her yerinden kolayca eri�ebilmek i�in)
     public static DeliveryManager Instance { get; private set; }
 
     [Header("Veri Havuzu")]
@@ -18,6 +17,9 @@ public class DeliveryManager : MonoBehaviour
     // UI'�n haberdar olmas� i�in Event'ler
     public event EventHandler OnRecipeSpawned;
     public event EventHandler OnRecipeCompleted;
+    public event EventHandler OnRecipeSuccess;
+    public event EventHandler OnRecipeFailed;
+
 
     private void Awake()
     {
@@ -46,7 +48,6 @@ public class DeliveryManager : MonoBehaviour
                 // Bekleyenler listesine ekle
                 waitingRecipeSOList.Add(waitingRecipeSO);
 
-                // Aray�ze (UI) haber ver: "Yeni sipari� geldi, ekrana �iz!"
                 OnRecipeSpawned?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -87,20 +88,16 @@ public class DeliveryManager : MonoBehaviour
 
                 if (plateContentsMatchesRecipe)
                 {
-                    // BA�ARILI TESL�MAT!
-                    Debug.Log("Sipari� Ba�ar�yla Teslim Edildi: " + waitingRecipeSO.recipeName);
-
                     waitingRecipeSOList.RemoveAt(i);
 
-                    // UI'a haber ver: "Bu sipari� bitti, ekrandan sil!"
                     OnRecipeCompleted?.Invoke(this, EventArgs.Empty);
+                    OnRecipeSuccess?.Invoke(this, EventArgs.Empty);
                     return;
                 }
             }
         }
 
-        // E�er d�ng� bittiyse ve return olmad�ysa, oyuncu yanl�� yemek getirmi�tir.
-        Debug.Log("Hata: Oyuncu yanl�� bir yemek getirdi veya b�yle bir sipari� yok!");
+        OnRecipeFailed?.Invoke(this, EventArgs.Empty);
     }
 
     // UI'�n bekleyen listeyi okuyabilmesi i�in

@@ -569,6 +569,8 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
         }
 
         Debug.LogWarning("[Deliver] Eşya bırakılamadı veya birleştirme başarısız.");
+
+        FailActiveTask();
     }
 
 
@@ -600,6 +602,21 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
         lastDistToTarget = float.MaxValue;
     }
 
+    public void ForceCancelTask()
+    {
+        if (activeTask != null)
+        {
+
+            // Ajanın elinde malzeme kaldıysa, takılmaması için malzemeyi yok et
+            if (HasKitchenObject())
+            {
+                GetKitchenObject().DestroySelf();
+                ClearKitchenObject();
+            }
+
+            FailActiveTask();
+        }
+    }
 
 
     // ── HEURİSTİC ─────────────────────────────────────────────────

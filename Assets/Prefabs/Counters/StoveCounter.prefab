@@ -158,6 +158,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1842685395457145906, guid: 0234a8b8d01f496489b1f6297a53daee, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3061407913045455452}
+    - targetCorrespondingSourceObject: {fileID: 1842685395457145906, guid: 0234a8b8d01f496489b1f6297a53daee, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 524414372824412111}
   m_SourcePrefab: {fileID: 100100000, guid: 0234a8b8d01f496489b1f6297a53daee, type: 3}
 --- !u!4 &984030120260786362 stripped
 Transform:
@@ -186,6 +189,21 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 927a1763e5221c24d93a6c4cfaf1e2a6, type: 2}
   burningRecipeSOArray:
   - {fileID: 11400000, guid: 72f28bb09837a9b46a06b20db1239c29, type: 2}
+--- !u!114 &524414372824412111
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1994232408768846630}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59f9a67df46c5274891333df78ddde44, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StoveCounterSound
+  sizzleClip: {fileID: 8300000, guid: 511c1cbfb8b48b64083aec78fe17115f, type: 3}
+  warningThreshold: 0.5
+  warningInterval: 0.2
 --- !u!4 &3820476842525584337 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3979889215485709509, guid: 0234a8b8d01f496489b1f6297a53daee, type: 3}

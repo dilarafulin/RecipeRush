@@ -47,6 +47,7 @@ GameObject:
   - component: {fileID: 2130435636683757224}
   - component: {fileID: 9141084854411935511}
   - component: {fileID: 2272572226317997282}
+  - component: {fileID: 2179364434719019544}
   m_Layer: 0
   m_Name: SousChef
   m_TagString: Untagged
@@ -237,6 +238,20 @@ MonoBehaviour:
   rayMissColor: {r: 1, g: 1, b: 1, a: 1}
   m_StartVerticalOffset: 0
   m_EndVerticalOffset: 0
+--- !u!114 &2179364434719019544
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7313478203997278910}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ef7774d2cad053648b9f8e200421107e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FootstepSounds
+  footstepInterval: 0.3
+  volume: 1
 --- !u!1001 &6655744305399900764
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -5,6 +5,9 @@ public class CuttingCounter : BaseCounter, IHasProgress
 {
     public event EventHandler<IHasProgress.OnProgressChangedEventArgs> OnProgressChanged;
 
+    // Ses için: herhangi bir tahtada her geçerli kesme vuruşunda tetiklenir
+    public static event EventHandler OnAnyCut;
+
     [SerializeField] private CuttingRecipeSO[] cuttingRecipeSOArray; // Desteklenen tüm tarifler
 
     private int cuttingProgress;
@@ -65,6 +68,7 @@ public class CuttingCounter : BaseCounter, IHasProgress
         {
             // Eşya var ve kesilebilir bir eşya. Kesme işlemi başlar.
             cuttingProgress++;
+            OnAnyCut?.Invoke(this, EventArgs.Empty); // kesme sesi
 
             CuttingRecipeSO cuttingRecipeSO = GetCuttingRecipeSOWithInput(GetKitchenObject().GetKitchenObjectSO());
 

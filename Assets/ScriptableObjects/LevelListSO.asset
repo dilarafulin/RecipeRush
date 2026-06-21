@@ -15,10 +15,10 @@ MonoBehaviour:
   levels:
   - levelName: 1
     durationSeconds: 120
-    targetOrders: 2
+    targetOrders: 3
   - levelName: 2
     durationSeconds: 120
-    targetOrders: 3
+    targetOrders: 4
   - levelName: 3
     durationSeconds: 180
     targetOrders: 5

@@ -1,7 +1,13 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
 public class KitchenObject : MonoBehaviour
 {
+    // Ses için statik olaylar: herhangi bir nesne alındığında / tezgaha bırakıldığında
+    // tetiklenir. sender = bu KitchenObject (konum için transform'undan okunur).
+    public static event EventHandler OnAnyObjectPickedUp; // ele alındı (oyuncu/ajan)
+    public static event EventHandler OnAnyObjectDropped;   // bir tezgaha bırakıldı
+
     [SerializeField] private KitchenObjectSO kitchenObjectSO;
 
     private IKitchenObjectParent kitchenObjectParent;
@@ -46,6 +52,12 @@ public class KitchenObject : MonoBehaviour
         {
             rb.isKinematic = true;
         }
+
+        // Ses: yeni ebeveyn bir tezgahsa "bırakma", değilse (oyuncu/ajan eli) "alma"
+        if (parent is BaseCounter)
+            OnAnyObjectDropped?.Invoke(this, EventArgs.Empty);
+        else
+            OnAnyObjectPickedUp?.Invoke(this, EventArgs.Empty);
     }
 
     public IKitchenObjectParent GetKitchenObjectParent()

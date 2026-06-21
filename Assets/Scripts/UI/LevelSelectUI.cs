@@ -23,14 +23,13 @@ public class LevelSelectUI : MonoBehaviour
         for (int i = 0; i < levelList.levels.Count; i++)
         {
             int index = i; // closure için kopya
-            LevelConfig cfg = levelList.levels[i];
 
             Button btn = Instantiate(buttonTemplate, buttonContainer);
             btn.gameObject.SetActive(true);
 
             TextMeshProUGUI label = btn.GetComponentInChildren<TextMeshProUGUI>();
             if (label != null)
-                label.text = $"Bölüm {index + 1}\n{cfg.targetOrders} sipariş / {Mathf.RoundToInt(cfg.durationSeconds)}sn";
+                label.text = $"Bölüm {index + 1}"; // detay GameScene UI'da gösteriliyor
 
             btn.onClick.AddListener(() =>
             {
