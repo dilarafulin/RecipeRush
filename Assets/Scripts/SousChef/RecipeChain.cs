@@ -1,9 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Verilen RecipeSO'yu okuyup atomik görev planına çevirir:
-// Tabak al → park et → [her malzeme: üret → tabağa birleştir] → tabağı al → teslim et.
-// Üretim hattı geriye doğru türetilir: final ürün ← (pişirme) ← (kesme) ← ham kaynak.
 public class RecipeChain : SousChefChainBase
 {
     [Header("Tarif Veritabanı")]
@@ -22,6 +19,7 @@ public class RecipeChain : SousChefChainBase
         // Hedef tezgah adım ÇALIŞIRKEN çözülür; plan kurulurken sahne durumu farklı olabilir
         public System.Func<BaseCounter> resolveTarget;
         public string label;
+        public KitchenObjectSO relatedFinalSO;
     }
 
     [Header("Test")]
@@ -33,6 +31,11 @@ public class RecipeChain : SousChefChainBase
         var kb = UnityEngine.InputSystem.Keyboard.current;
         if (kb != null && kb.rKey.wasPressedThisFrame && !IsRunning())
             StartNextWaitingRecipe();
+    }
+
+    private void Add(SousChefCommand cmd, System.Func<BaseCounter> resolver, string label, KitchenObjectSO finalSO = null)
+    {
+        plan.Add(new PlannedStep { command = cmd, resolveTarget = resolver, label = label, relatedFinalSO = finalSO });
     }
 
     public void SetRecipe(RecipeSO recipe) => activeRecipe = recipe;
@@ -64,7 +67,7 @@ public class RecipeChain : SousChefChainBase
             Cancel();
             return;
         }
-        Debug.Log($"[RecipeChain] 📋 '{activeRecipe.recipeName}' planı: {plan.Count} adım");
+        Debug.Log($"[RecipeChain]  '{activeRecipe.recipeName}' planı: {plan.Count} adım");
         base.StartChain();
     }
 
@@ -72,34 +75,68 @@ public class RecipeChain : SousChefChainBase
     {
         if (step >= plan.Count)
         {
-            Debug.Log($"[RecipeChain] 🍽 Tarif tamamlandı: {activeRecipe.recipeName}");
+            Debug.Log($"[RecipeChain]  Tarif tamamlandı: {activeRecipe.recipeName}");
             Cancel();
             taskManager.OnChainCompleted();
             return;
         }
 
-        // Hedef (örn. park için boş tezgah) o an yoksa iptal etme — açılana kadar bekle
         PlannedStep s = plan[step];
+
+        // ─── ÖN KONTROL (LOOK-AHEAD) SİSTEMİ ───
+        if (s.relatedFinalSO != null && plateParkCounter != null && plateParkCounter.HasKitchenObject())
+        {
+            if (plateParkCounter.GetKitchenObject() is PlateKitchenObject plate)
+            {
+                if (plate.GetKitchenObjectSOList().Contains(s.relatedFinalSO))
+                {
+                    Debug.Log($"[RecipeChain]  ÖN KONTROL: {s.relatedFinalSO.name} zaten tabakta! Adımlar ayıklanıyor.");
+
+                    // 1. Bu iptal olan malzemeyle ilgili OLMAYAN ilk adımın indeksini bul (Yeni malzemenin adımı)
+                    int nextValidStep = step;
+                    while (nextValidStep < plan.Count && plan[nextValidStep].relatedFinalSO == s.relatedFinalSO)
+                    {
+                        nextValidStep++;
+                    }
+
+                    // 2. Eğer ajanın elinde bir şey kalmışsa, mekan dünyasına uyması için hedef tezgah bulalım
+                    if (agent.HasKitchenObject())
+                    {
+                        BaseCounter disposalCounter = FindNearest<TrashCounter>(c => !c.HasKitchenObject());
+
+                        if (disposalCounter != null)
+                        {
+                            Debug.Log($"[RecipeChain]  Fazlalık malzeme ({agent.GetKitchenObject().GetKitchenObjectSO().name}) tezgaha/çöpe bırakılmaya götürülüyor.");
+
+                            // KRİTİK ADIM: Bırakma görevi bittiğinde sistemin tam olarak 'nextValidStep'e 
+                            // geçebilmesi için zincir sayacını (nextValidStep - 1) yapıyoruz. 
+                            // Görev tamamlanınca otomatik +1 alıp tam hedef adıma uyanacak.
+                            currentStep = nextValidStep - 1;
+
+                            GiveWhenAvailable(currentStep, SousChefCommand.DeliverToCounter, () => disposalCounter, "Fazlalık malzemeyi elden çıkar");
+                            return; // Kodun aşağıya akmasını ve eski adımı çalıştırmasını engelliyoruz
+                        }
+                        else
+                        {
+                            // Güvenlik ağı: Eğer mutfaktaki tüm tezgahlar ağzına kadar doluysa mecbur yok ediyoruz
+                            Debug.LogWarning("[RecipeChain] Fazlalığı bırakacak hiçbir boş yer yok! Mecburen yok ediliyor.");
+                            agent.GetKitchenObject().DestroySelf();
+                            agent.ClearKitchenObject();
+                        }
+                    }
+
+                    // 3. Eğer ajanın eli zaten boşsa, hiç beklemeden doğrudan sonraki malzemeye ışınlan
+                    currentStep = nextValidStep;
+                    ExecuteStep(currentStep);
+                    return;
+                }
+            }
+        }
+
+        // Hedef yoksa iptal etme — açılana kadar bekle
         GiveWhenAvailable(step, s.command, s.resolveTarget, $"Adım {step + 1}/{plan.Count}: {s.label}");
     }
 
-    // Makro araya girip yarıda kestikten sonra: tabağın O ANKİ içeriğine bakıp
-    // eksik malzemeler için yeniden planla ve devam et (statik plana takılıp kalma)
-    public override void ResumeFromState()
-    {
-        Debug.Log("[RecipeChain] ▶ Kesintiden devam — tabağın durumuna göre yeniden planlanıyor");
-        if (!BuildPlan(resuming: true))
-        {
-            Debug.LogError("[RecipeChain] Devam planı kurulamadı.");
-            Cancel();
-            taskManager.OnChainCompleted();
-            return;
-        }
-        currentStep = 0;
-        ExecuteStep(0);
-    }
-
-    // ── PLAN KURULUMU ────────────────────────────────────────────
 
     private bool BuildPlan(bool resuming = false)
     {
@@ -124,8 +161,12 @@ public class RecipeChain : SousChefChainBase
         foreach (KitchenObjectSO finalSO in activeRecipe.kitchenObjectSOList)
         {
             if (onPlate.Contains(finalSO)) continue; // zaten tabakta → atla
-            if (!AddStepsToProduceInHand(finalSO)) return false;
-            Add(SousChefCommand.DeliverToCounter, () => plateParkCounter, $"Tabağa ekle: {finalSO.name}");
+
+            // DEĞİŞEN KISIM: finalSO'yu metoda iletiyoruz
+            if (!AddStepsToProduceInHand(finalSO, finalSO)) return false;
+
+            // DEĞİŞEN KISIM: finalSO etiketini ekliyoruz
+            Add(SousChefCommand.DeliverToCounter, () => plateParkCounter, $"Tabağa ekle: {finalSO.name}", finalSO);
         }
 
         // 3. Tabağı al ve teslim et
@@ -135,59 +176,41 @@ public class RecipeChain : SousChefChainBase
     }
 
     // İstenen ürünü ajanın ELİNE getirecek adımları ekler (özyinelemeli geri türetme)
-    private bool AddStepsToProduceInHand(KitchenObjectSO targetSO)
+    // DEĞİŞEN KISIM: 2. parametre olarak finalSO eklendi
+    private bool AddStepsToProduceInHand(KitchenObjectSO targetSO, KitchenObjectSO finalSO)
     {
-        // Pişirilerek mi elde ediliyor? (örn: pişmiş köfte ← çiğ köfte)
         if (TryGetFryingInput(targetSO, out KitchenObjectSO fryInput))
         {
-            if (!AddStepsToProduceInHand(fryInput)) return false;
+            if (!AddStepsToProduceInHand(fryInput, finalSO)) return false;
             Add(SousChefCommand.CookIngredient,
                 () => FindNearest<StoveCounter>(s => !s.HasKitchenObject() && s.CanFry(fryInput)),
-                $"Pişir: {targetSO.name}");
-            return true; // pişen ürün elde biter
+                $"Pişir: {targetSO.name}", finalSO); // finalSO eklendi
+            return true;
         }
 
-        // Kesilerek mi elde ediliyor? (örn: dilim domates ← bütün domates)
         if (TryGetCuttingInput(targetSO, out KitchenObjectSO cutInput))
         {
-            if (!AddStepsToProduceInHand(cutInput)) return false;
+            if (!AddStepsToProduceInHand(cutInput, finalSO)) return false;
 
-            // Bu kesme işlemine ayrılan tahtayı yakala ve KES/AL adımlarında da
-            // AYNI tahtayı kullan. Yoksa adımlar "en yakın dolu tahta"yı bulur ve
-            // oyuncunun kendi malzemesini koyduğu başka tahtayı yanlışlıkla kapabilir.
             CuttingCounter reservedCutter = null;
             Add(SousChefCommand.DeliverToCounter,
-                () =>
-                {
-                    reservedCutter = FindNearest<CuttingCounter>(c => !c.HasKitchenObject());
-                    return reservedCutter;
-                },
-                $"Tahtaya bırak: {cutInput.name}");
-            Add(SousChefCommand.ChopIngredient,
-                () => reservedCutter,
-                $"Kes: {targetSO.name}");
-            Add(SousChefCommand.FetchIngredient,
-                () => reservedCutter,
-                $"Kesilmişi al: {targetSO.name}");
-            return true; // kesilen ürün elde biter
+                () => { reservedCutter = FindNearest<CuttingCounter>(c => !c.HasKitchenObject()); return reservedCutter; },
+                $"Tahtaya bırak: {cutInput.name}", finalSO); // finalSO eklendi
+
+            Add(SousChefCommand.ChopIngredient, () => reservedCutter, $"Kes: {targetSO.name}", finalSO); // finalSO eklendi
+            Add(SousChefCommand.FetchIngredient, () => reservedCutter, $"Kesilmişi al: {targetSO.name}", finalSO); // finalSO eklendi
+            return true;
         }
 
-        // Ham malzeme — eşleşen kasadan al
         KitchenObjectSO rawSO = targetSO;
         SourceCounter source = FindNearest<SourceCounter>(sc => sc.GetKitchenObjectSO() == rawSO);
-        if (source == null)
-        {
-            Debug.LogError($"[RecipeChain] '{rawSO.name}' üreten SourceCounter yok ve işleme tarifi de bulunamadı!");
-            return false;
-        }
+        if (source == null) return false;
+
         Add(SousChefCommand.FetchIngredient,
             () => FindNearest<SourceCounter>(sc => sc.GetKitchenObjectSO() == rawSO),
-            $"Kasadan al: {rawSO.name}");
+            $"Kasadan al: {rawSO.name}", finalSO); // finalSO eklendi
         return true;
     }
-
-    private void Add(SousChefCommand cmd, System.Func<BaseCounter> resolver, string label)
-        => plan.Add(new PlannedStep { command = cmd, resolveTarget = resolver, label = label });
 
     private BaseCounter ResolveParkCounter()
     {

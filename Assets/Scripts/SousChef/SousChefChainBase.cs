@@ -9,6 +9,7 @@ public abstract class SousChefChainBase : MonoBehaviour
     protected int currentStep = -1;
 
     protected BaseCounter[] cachedCounters;
+    private Coroutine activeWaitCoroutine;
 
     protected virtual void Awake()
     {
@@ -31,6 +32,11 @@ public abstract class SousChefChainBase : MonoBehaviour
     public virtual void OnStepCompleted()
     {
         if (!IsRunning()) return;
+        if (activeWaitCoroutine != null)
+        {
+            StopCoroutine(activeWaitCoroutine);
+            activeWaitCoroutine = null;
+        }
         currentStep++;
         Debug.Log($"[Chain] OnStepCompleted çağrıldı → currentStep: {currentStep}");
         ExecuteStep(currentStep);
@@ -41,6 +47,11 @@ public abstract class SousChefChainBase : MonoBehaviour
     public virtual void ResumeCurrentStep()
     {
         if (!IsRunning()) return;
+        if (activeWaitCoroutine != null)
+        {
+            StopCoroutine(activeWaitCoroutine);
+            activeWaitCoroutine = null;
+        }
         Debug.Log($"[Chain] ▶ Devam: adım {currentStep} yeniden veriliyor");
         ExecuteStep(currentStep);
     }
@@ -71,8 +82,15 @@ public abstract class SousChefChainBase : MonoBehaviour
     // kadar BEKLE ve tekrar dene. Ajan bu sırada (varsa elindekiyle) boşta durur.
     // Tüm tezgahlar dolu → bir yer boşalınca zincir kaldığı adımdan devam eder.
     protected void GiveWhenAvailable(int step, SousChefCommand cmd,
-                                     System.Func<BaseCounter> resolver, string label)
+                                 System.Func<BaseCounter> resolver, string label)
     {
+        // Önceki bekleyen coroutine varsa öldür — çift coroutine'i önler
+        if (activeWaitCoroutine != null)
+        {
+            StopCoroutine(activeWaitCoroutine);
+            activeWaitCoroutine = null;
+        }
+
         BaseCounter target = resolver();
         if (target != null)
         {
@@ -81,29 +99,42 @@ public abstract class SousChefChainBase : MonoBehaviour
             return;
         }
         Debug.Log($"[Chain] Hedef müsait değil, açılması bekleniyor: {label}");
-        StartCoroutine(WaitThenGive(step, cmd, resolver, label));
+        activeWaitCoroutine = StartCoroutine(WaitThenGive(step, cmd, resolver, label));
     }
 
     private IEnumerator WaitThenGive(int step, SousChefCommand cmd,
-                                    System.Func<BaseCounter> resolver, string label)
+                                System.Func<BaseCounter> resolver, string label)
     {
-        // Adım değişmediği (zincir hâlâ bu adımda) ve çalışır olduğu sürece bekle
         while (IsRunning() && currentStep == step)
         {
             yield return new WaitForSeconds(0.5f);
-            if (!IsRunning() || currentStep != step) yield break;
+            if (!IsRunning() || currentStep != step)
+            {
+                activeWaitCoroutine = null;
+                yield break;
+            }
 
             BaseCounter target = resolver();
             if (target != null)
             {
                 Debug.Log($"[Chain] Hedef açıldı → {label} → {target.name}");
                 taskManager.GiveCommand(cmd, target);
+                activeWaitCoroutine = null;
                 yield break;
             }
         }
+        activeWaitCoroutine = null;
     }
 
-    public virtual void Cancel() => currentStep = -1;
+    public virtual void Cancel()
+    {
+        if (activeWaitCoroutine != null)
+        {
+            StopCoroutine(activeWaitCoroutine);
+            activeWaitCoroutine = null;
+        }
+        currentStep = -1;
+    }
 
     protected T FindNearest<T>(System.Func<T, bool> filter = null) where T : BaseCounter
     {

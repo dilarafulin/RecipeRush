@@ -35,6 +35,8 @@ public class Player : MonoBehaviour, IKitchenObjectParent, IMovable
             Debug.Log("Birden fazla oyuncu var");
         }
         Instance = this;
+
+        Debug.unityLogger.logEnabled = false;
     }
 
     private void Update()

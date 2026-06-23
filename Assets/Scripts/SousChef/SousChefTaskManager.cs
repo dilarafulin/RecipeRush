@@ -30,6 +30,8 @@ public class SousChefTaskManager : MonoBehaviour
     // tabağın durumuna göre kaldığı yerden devam ettirilir
     private SousChefChainBase interruptedChain;
 
+    private Coroutine waitForFreeCounterCoroutine;
+
     private void Awake()
     {
         Instance = this;
@@ -54,16 +56,17 @@ public class SousChefTaskManager : MonoBehaviour
 
     private void DeliveryManager_OnRecipeCompleted(object sender, EventArgs e)
     {
-        // Eğer ajan aktif olarak bir görevdeyse ve oyuncu bir siparişi teslim ettiyse:
         if (agent != null && activeTask != null)
         {
-            Debug.Log("[TaskManager] Oyuncu bir siparişi teslim etti. Ajanın görevi iptal ediliyor...");
 
-            // 2. adımda ajana eklediğimiz iptal metodunu çağırıyoruz.
-            // Bu metod ajanın elindekini yok edecek ve ardından FailActiveTask() çağırarak
-            // süreci tekrar TaskManager'ın OnTaskFailed() metoduna yönlendirecek.
-            // Böylece activeChain de temizlenmiş olacak.
-            agent.ForceCancelTask();
+            // Zincir çalışıyorsa onu KORU — sadece atomik görevi kes
+            if (activeChain != null && activeChain.IsRunning())
+            {
+                activeChain.Cancel();
+                chainPausedForOverride = false; // override değil, doğrudan kesme
+            }
+
+            agent.ForceCancelTask(); // OnTaskFailed tetiklenecek
         }
     }
     //polimorfizm
@@ -168,7 +171,13 @@ public class SousChefTaskManager : MonoBehaviour
                 // Boş tezgah YOK → açılana kadar BEKLE (ajan elinde tutarak boşta durur).
                 // Bir tezgah boşalınca bırakıp zincire devam edecek (çelişkiyi zorlama).
                 Debug.Log("[TaskManager] Bırakacak boş tezgah yok → açılması bekleniyor.");
-                StartCoroutine(WaitForFreeCounterThenDrop());
+
+                if (waitForFreeCounterCoroutine != null)
+                {
+                    StopCoroutine(waitForFreeCounterCoroutine);
+                }
+                waitForFreeCounterCoroutine = StartCoroutine(WaitForFreeCounterThenDrop());
+
                 return;
             }
 
@@ -213,10 +222,8 @@ public class SousChefTaskManager : MonoBehaviour
         }
     }
 
-    // Zaman aşımı / kurtarılamaz durum: görevi düşür ki TrainingManager yenisini atayabilsin
     public void OnTaskFailed()
     {
-        // Araya giren override başarısız olduysa zinciri iptal etme, devam ettir
         if (chainPausedForOverride && activeChain != null && activeChain.IsRunning())
         {
             chainPausedForOverride = false;
@@ -225,35 +232,36 @@ public class SousChefTaskManager : MonoBehaviour
             return;
         }
 
-        Debug.Log("[TaskManager] ❌ Görev başarısız — yeni görev atanacak");
+        // YENİ: Zincir hâlâ koşuyorsa ve override değilse, zinciri de devam ettir
         if (activeChain != null && activeChain.IsRunning())
         {
-            activeChain.Cancel();
-            activeChain = null;
+            Debug.Log("[TaskManager] ▶ Atomik görev dışarıdan kesildi — zincir aynı adımdan devam ediyor.");
+            activeTask = null;
+            activeChain.ResumeCurrentStep(); // Cancel() YOK
+            return;
         }
+
+        Debug.Log("[TaskManager] ❌ Görev başarısız — yeni görev atanacak");
         pendingOverrideCounter = null;
         pendingChain = null;
         activeTask = null;
 
-        // Bir makro yarıda kalan ana zinciri saklamışsa, onu geri yükleyip devam ettir
         if (interruptedChain != null)
         {
             SousChefChainBase resume = interruptedChain;
             interruptedChain = null;
             activeChain = resume;
-            Debug.Log("[TaskManager] ▶ Makro başarısız — ana zincir geri yüklendi.");
             resume.ResumeFromState();
             return;
         }
 
         OnTaskChanged?.Invoke(this, EventArgs.Empty);
     }
-
-    // Override ürününü bırakacak boş tezgah yokken: bir tezgah boşalana kadar bekler,
-    // boşalınca bırakma komutunu verir (bu da tamamlanınca zincir kaldığı yerden devam eder).
-    // Beklerken ajanın görevi yoktur → boşta durur (elinde malzemeyle).
     private IEnumerator WaitForFreeCounterThenDrop()
     {
+        float waitTime = 0f;
+        const float MAX_WAIT = 10f; // 10 saniye sonra zorla bırak
+
         while (activeChain != null && activeChain.IsRunning() && agent.HasKitchenObject())
         {
             BaseCounter drop = activeChain.FindDropCounter();
@@ -263,6 +271,18 @@ public class SousChefTaskManager : MonoBehaviour
                 GiveCommand(SousChefCommand.DeliverToCounter, drop);
                 yield break;
             }
+
+            waitTime += 0.5f;
+            if (waitTime >= MAX_WAIT)
+            {
+                Debug.LogWarning("[TaskManager] Boş tezgah 10s içinde açılmadı — elindeki yok ediliyor, zincir devam ediyor.");
+                agent.GetKitchenObject().DestroySelf();
+                agent.ClearKitchenObject();
+                chainPausedForOverride = false;
+                activeChain.ResumeCurrentStep();
+                yield break;
+            }
+
             yield return new WaitForSeconds(0.5f);
         }
     }

@@ -27,9 +27,14 @@ public class LevelSelectUI : MonoBehaviour
             Button btn = Instantiate(buttonTemplate, buttonContainer);
             btn.gameObject.SetActive(true);
 
+            bool unlocked = SaveManager.IsLevelUnlocked(index);
+
             TextMeshProUGUI label = btn.GetComponentInChildren<TextMeshProUGUI>();
             if (label != null)
-                label.text = $"Bölüm {index + 1}"; // detay GameScene UI'da gösteriliyor
+                label.text = unlocked ? $"Bölüm {index + 1}" : $"Bölüm {index + 1}";
+
+            // Kilitli bölüm tıklanamaz
+            btn.interactable = unlocked;
 
             btn.onClick.AddListener(() =>
             {

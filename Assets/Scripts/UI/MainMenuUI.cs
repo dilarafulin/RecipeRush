@@ -5,10 +5,11 @@ using UnityEngine.UI;
 public class MainMenuUI : MonoBehaviour
 {
     [SerializeField] private Button playButton;
+    [SerializeField] private Button continueButton;       
     [SerializeField] private Button quitButton;
-    [SerializeField] private Button levelBackButton;      // level ekranındaki "Geri" (opsiyonel)
-    [SerializeField] private GameObject mainMenuPanel;    // logo + Play + Quit grubu
-    [SerializeField] private GameObject levelSelectPanel; // bölüm seçim ekranı
+    [SerializeField] private Button levelBackButton;       
+    [SerializeField] private GameObject mainMenuPanel;    
+    [SerializeField] private GameObject levelSelectPanel;  
 
     private void Awake()
     {
@@ -16,7 +17,22 @@ public class MainMenuUI : MonoBehaviour
         quitButton.onClick.AddListener(() => Application.Quit());
         if (levelBackButton != null) levelBackButton.onClick.AddListener(ShowMainMenu);
 
+        if (continueButton != null)
+        {
+            // Kayıtlı ilerleme yoksa "Devam Et"i gizle
+            continueButton.gameObject.SetActive(SaveManager.HasProgress());
+            continueButton.onClick.AddListener(ContinueLastLevel);
+        }
+
         ShowMainMenu(); // başlangıç: menü açık, level paneli kapalı
+    }
+
+    // Son oynanan bölümü doğrudan yükler
+    public void ContinueLastLevel()
+    {
+        LevelSelection.CurrentLevelIndex = SaveManager.LastPlayedLevel;
+        Time.timeScale = 1f;
+        Loader.Load(Loader.Scene.GameScene);
     }
 
     // Play → ana menüyü GİZLE, bölüm seçimini GÖSTER (opak arka plan yok)

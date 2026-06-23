@@ -535,7 +535,12 @@ public class SousChefAgent : Agent, IMovable, IKitchenObjectParent
     // SousChefAgent.cs
     private void HandleDeliver()
     {
-        if (!HasKitchenObject() || activeTask?.targetCounter == null) return;
+        if (!HasKitchenObject() || activeTask?.targetCounter == null)
+        {
+            Debug.LogWarning("[Deliver] Ajanın elinde bırakacak eşya yok! Görev iptal ediliyor.");
+            FailActiveTask();
+            return;
+        }
 
         activeTask.targetCounter.InteractFromAgent(this);
 

@@ -41,6 +41,9 @@ public class GameManager : MonoBehaviour
         Time.timeScale = 1f; // önceki bölümden kalma 0 olabilir
         state = State.CountdownToStart;
         countdownToStartTimer = 3f;
+
+        // Bu bölüme girildi → "en son oynanan" olarak kaydet (Devam Et için).
+        SaveManager.LastPlayedLevel = LevelSelection.CurrentLevelIndex;
     }
 
     private void Start()
@@ -70,6 +73,7 @@ public class GameManager : MonoBehaviour
         {
             state = State.LevelWon;
             Time.timeScale = 0f; // sahne donsun, sonuç paneli gösterilsin
+            SaveManager.MarkLevelCompleted(LevelSelection.CurrentLevelIndex); // sonraki bölümün kilidini aç
             OnLevelWon?.Invoke(this, EventArgs.Empty);
             OnStateChanged?.Invoke(this, EventArgs.Empty);
         }
